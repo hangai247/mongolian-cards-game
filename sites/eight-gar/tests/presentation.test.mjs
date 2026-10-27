@@ -35,3 +35,14 @@ for(const mode of ['reduced-motion','hidden-tab','already-cancelled'])test(`${mo
     assert.deepEqual(renders,mode==='already-cancelled'?[]:[after]);
   }finally{globalThis.document=oldDocument;globalThis.matchMedia=oldMatchMedia;}
 });
+
+test('explicit motion-off settles immediately even without a device preference',async()=>{
+  const {animateStep}=await import('../dist/motion.js');
+  const oldDocument=globalThis.document,oldMatchMedia=globalThis.matchMedia;
+  try{
+    globalThis.document={hidden:false};globalThis.matchMedia=()=>({matches:false});
+    const renders=[];const after={committed:true};
+    await animateStep({after},{motionEnabled:false,signal:new AbortController().signal,render:s=>renders.push(s),cardElement:()=>{throw new Error('No flying cards');}});
+    assert.deepEqual(renders,[after]);
+  }finally{globalThis.document=oldDocument;globalThis.matchMedia=oldMatchMedia;}
+});

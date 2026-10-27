@@ -25,3 +25,10 @@ test('public actions produce bounded distinct poses without accepting private ca
     assert.ok(Object.values(p).every(Number.isFinite));
   }
 });
+
+test('brief reaction envelopes are bounded and disabled by still mode',()=>{
+  for(const reactionType of ['surprise','win'])for(const reaction of [0,.5,1]){
+    const pose=poseFor({seat:2,time:1,reaction,reactionType});assert(Math.abs(pose.head)<.04);assert(Math.abs(pose.lean)<.03);
+    assert.deepEqual(poseFor({seat:2,still:true,reaction,reactionType}),{breath:0,head:0,lean:0,reach:0});
+  }
+});

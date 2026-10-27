@@ -127,25 +127,67 @@ export function beatsCard(candidate: Card, target: Card, trump: Suit): boolean {
   if (candidate.suit !== target.suit) return candidate.suit === trump && target.suit !== trump;
   return RANKS.indexOf(candidate.rank) > RANKS.indexOf(target.rank);
 }
-/** Perfect matching, not a positional or greedy comparison. At most five cards. */
-export function beatsSet(candidate: readonly Card[], target: readonly Card[], trump: Suit): boolean {
-  if (![1, 3, 5].includes(candidate.length) || candidate.length !== target.length) return false;
-  if (new Set(candidate.map(card => card.id)).size !== candidate.length
-    || new Set(target.map(card => card.id)).size !== target.length) return false;
-  if (candidate.length > 1 && [...candidate, ...target].some(card => card.kind === 'joker')) return false;
-  const used = new Set<number>();
-  const search = (index: number): boolean => {
-    if (index === target.length) return true;
-    for (let i = 0; i < candidate.length; i++) {
-      if (!used.has(i) && beatsCard(candidate[i]!, target[index]!, trump)) {
-        used.add(i);
-        if (search(index + 1)) return true;
-        used.delete(i);
-      }
+export interface DefenseAnalysis {
+  readonly assignments: readonly { readonly candidateIndex: number; readonly targetIndex: number }[];
+  readonly unmatchedCandidateIndices: readonly number[];
+  readonly unmatchedTargetIndices: readonly number[];
+  readonly valid: boolean;
+  readonly reason: 'invalid-target' | 'duplicate-cards' | 'jokers-must-play-alone' | 'wrong-count' | 'uncovered-targets' | null;
+}
+/** Maximum one-to-one coverage, including incomplete selections. Ties prefer target order,
+ * then card ID, independent of selection/hand sorting. At most 32 target subsets. */
+export function analyzeDefense(candidate: readonly Card[], target: readonly Card[], trump: Suit): DefenseAnalysis {
+  const invalidTarget = ![1, 3, 5].includes(target.length);
+  const duplicate = new Set(candidate.map(card => card.id)).size !== candidate.length
+    || new Set(target.map(card => card.id)).size !== target.length;
+  const multiple = target.length > 1 || candidate.length > 1;
+  const jokerBlocked = multiple && [...candidate, ...target].some(card => card.kind === 'joker');
+  const empty = Array<number>(target.length).fill(-1);
+  const prefer = (a: number[], b: number[]): boolean => {
+    for (let t = 0; t < target.length; t++) {
+      const ai = a[t]!, bi = b[t]!;
+      if (ai === bi) continue;
+      if (ai < 0) return false;
+      if (bi < 0) return true;
+      return candidate[ai]!.id < candidate[bi]!.id;
     }
     return false;
   };
-  return search(0);
+  const matches = new Map<number, number[]>([[0, empty]]);
+  if (!invalidTarget && !duplicate) {
+    for (let c = 0; c < candidate.length; c++) {
+      if (multiple && candidate[c]!.kind === 'joker') continue;
+      for (const [mask, assignment] of [...matches]) {
+        for (let t = 0; t < target.length; t++) {
+          if ((mask & (1 << t)) || (multiple && target[t]!.kind === 'joker')
+            || !beatsCard(candidate[c]!, target[t]!, trump)) continue;
+          const next = [...assignment]; next[t] = c;
+          const nextMask = mask | (1 << t), previous = matches.get(nextMask);
+          if (!previous || prefer(next, previous)) matches.set(nextMask, next);
+        }
+      }
+    }
+  }
+  let best = empty, covered = 0;
+  for (const assignment of matches.values()) {
+    const count = assignment.filter(index => index >= 0).length;
+    if (count > covered || (count === covered && prefer(assignment, best))) { best = assignment; covered = count; }
+  }
+  const assignments = best.flatMap((candidateIndex, targetIndex) => candidateIndex < 0 ? [] : [{ candidateIndex, targetIndex }]);
+  const used = new Set(best);
+  const reason = invalidTarget ? 'invalid-target' : duplicate ? 'duplicate-cards' : jokerBlocked ? 'jokers-must-play-alone'
+    : candidate.length !== target.length ? 'wrong-count' : covered !== target.length ? 'uncovered-targets' : null;
+  return {
+    assignments,
+    unmatchedCandidateIndices: candidate.flatMap((_, index) => used.has(index) ? [] : [index]),
+    unmatchedTargetIndices: best.flatMap((index, t) => index < 0 ? [t] : []),
+    valid: reason === null, reason,
+  };
+}
+/** Perfect matching, not a positional or greedy comparison. At most five cards. */
+export function beatsSet(candidate: readonly Card[], target: readonly Card[], trump: Suit): boolean {
+  if (![1, 3, 5].includes(candidate.length) || candidate.length !== target.length) return false;
+  return analyzeDefense(candidate, target, trump).valid;
 }
 export function isLeadStructure(cards: readonly Card[]): boolean {
   if (new Set(cards.map(card => card.id)).size !== cards.length) return false;

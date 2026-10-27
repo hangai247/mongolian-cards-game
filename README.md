@@ -88,3 +88,9 @@ Process actions sequentially per game and save the entire returned state atomica
 Use engine-created state as the trusted input. TypeScript types are not a runtime validator for arbitrary uploaded state. The starter does not implement authentication, persistence, saved-game import validation, timers, or reconnect policies.
 
 `RuleError.code` identifies a rejected move. Input state is unchanged on success or failure. Returned snapshots are readonly in TypeScript; callers should treat them as immutable at runtime as well.
+
+## Private teammate signals
+
+Players can voluntarily share real 3-card and 5-card sets with only their three teammates during discussion or play. Signals persist until cleared, invalidated by a completed hand change, or the round ends. They do not consume turns or change timers. Bots share their own sets without changing their move choices. The online server checks and filters every declaration; practice is available at `/practice.html`.
+
+`npm run build` also generates the browser copies of the shared rules. `npm run test:all` includes signal validation, save/reconnect, team privacy and authenticated socket tests. See the specification for the `./signals` helper API and `game:signal` protocol.

@@ -37,3 +37,23 @@ The client needs the game server (`server/` in the repository root). Build the e
 - Spectators and joining a match that has already started.
 - Text chat. Voice is one shared channel for all eight players; computer players never join it.
 - TURN over TLS on port 443: strict corporate networks that block UDP and non-443 TCP get the game without voice.
+
+## Private set signals and practice
+
+Run the root `npm run build` before serving the browser files; it copies the shared compiled engine, strategy and signal helpers into `dist/rules/`. `practice.html` preserves the local game separately from the online landing page, including its existing browser save key. Signal controls are in the hand area and stay available during opening discussion and other players’ turns. Only teammates receive name badges. Active signals survive reloads, and older saves continue to load with no declarations.
+
+The common `team-signals.js` controls accept only a viewer’s hand and filtered team declarations. Online callers must rotate real seats to display seats before rendering, while sending the actual game revision to `game:signal`. A private update must refresh signal controls without resetting the move animation, opening-player selection, or turn countdown.
+
+## Practice table clarity and atmosphere
+
+`practice.html` now has a jade shield for your team and an ochre ring for opponents, a named teammate hand-count summary, and explicit current/next-seat markers. At seven plays the next seat is labelled “After pickup”; a successful eighth defense returns the lead to the actor unless the round ends. The eight-step Унтана meter follows the displayed transition, including reserve refill before sleep, and never exposes sleeping cards.
+
+While defending, the preview pairs selected cards with the latest targets and explains incomplete coverage, unused cards, and joker restrictions. `analyzeDefense(candidate, target, trump)` in the engine returns maximum one-to-one coverage, unmatched indices, and legality. Stable card-ID tie-breaking keeps equivalent mappings consistent through hand sorting. `beatsSet` retains its original boolean contract and rules.
+
+On screens up to 700px, **Focus table** collapses portraits into a compact roster, enlarges cards, and keeps actions at the bottom while the hand is in view. All public table cards remain available, private team signals retain their visibility rules, and large hands scroll horizontally. The full room remains the default, and desktop always uses it.
+
+**Atmosphere** offers independent sound, volume, and motion settings. Short sounds are synthesized locally with Web Audio; no media service or runtime network request is needed. Sound defaults to 25% and starts only after interaction. Motion-off or a device reduced-motion preference skips flying cards and settles character poses. Character reactions are brief and suppressed while portraits are collapsed. Effects stop on cancellation, pause, tab hiding, or a fresh match. Restoring a save does not replay sounds or reactions.
+
+Preferences use the separate browser key `naiman-gar-table-preferences-v1`; the match schema and server protocol are unchanged. These controls are wired to the practice entrypoint, with styles isolated in `practice-table.css`. The shared motion and character components keep their existing defaults for the multiplayer entrypoint.
+
+Verification: `npm run check` at the repository root, `npm test -w sites/eight-gar`, and `npm test -w server`. For repeatable browser checks, serve the repository root on a separate local test origin and open `sites/eight-gar/tests/browser-qa.html`. The runner uses disposable browser saves on that origin and exercises 320/390/700/1440px layouts, defense pairing, sleep/refill/win transitions, large pickups, layout cancellation, orientation, and unavailable audio/WebGL and reduced-motion fallbacks. It must not run against a browser origin containing a match you want to retain.

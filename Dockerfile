@@ -12,6 +12,7 @@ RUN npm ci --workspaces --include-workspace-root
 # Sources: engine (root), server, and the static client.
 COPY tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
 COPY server ./server
 COPY sites/eight-gar ./sites/eight-gar
 RUN npm run build:all

@@ -49,12 +49,13 @@ export function clearSession(code) {
 /** Opens the authenticated socket. Returned client exposes acked requests and typed subscriptions. */
 export function connect(token) {
   const socket = io({ auth: { token }, path: '/socket.io', transports: ['websocket', 'polling'] });
-  const listeners = { state: new Set(), update: new Set(), closed: new Set(), connection: new Set() };
+  const listeners = { signals: new Set(), state: new Set(), update: new Set(), closed: new Set(), connection: new Set() };
   let offset = 0;
   const emit = (kind, ...args) => { for (const fn of listeners[kind]) { try { fn(...args); } catch (error) { console.error(error); } } };
   const noteClock = payload => { if (typeof payload?.serverNow === 'number') offset = payload.serverNow - Date.now(); };
   socket.on('room:state', payload => { noteClock(payload); emit('state', payload); });
   socket.on('game:update', payload => { noteClock(payload); emit('update', payload); });
+  socket.on('game:signals', payload => emit('signals', payload));
   socket.on('room:closed', payload => emit('closed', payload));
   socket.on('connect', () => emit('connection', true, null));
   socket.on('disconnect', reason => emit('connection', false, { code: 'DISCONNECTED', message: reason }));
@@ -69,6 +70,7 @@ export function connect(token) {
         });
       });
     },
+    onSignals(fn) { listeners.signals.add(fn); return () => listeners.signals.delete(fn); },
     onState(fn) { listeners.state.add(fn); return () => listeners.state.delete(fn); },
     onUpdate(fn) { listeners.update.add(fn); return () => listeners.update.delete(fn); },
     onClosed(fn) { listeners.closed.add(fn); return () => listeners.closed.delete(fn); },

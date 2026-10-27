@@ -11,12 +11,12 @@ export function seatLayout(width, seat) {
   return { x, top, width:height*.75, height, labelTop:top-(mobile?29:36), handX:x+height*(i===0?.055:i===5?.035:0), handY:top+height*.835, fanScale, z:Math.abs(3-i) };
 }
 // Small, bounded movements preserve photographic anatomy and never affect game state.
-export function poseFor({seat, time=0, status=null, active=false, won=false, still=false}) {
+export function poseFor({seat, time=0, status=null, active=false, won=false, still=false, reaction=0, reactionType=null}) {
   if(still)return {breath:0,head:0,lean:0,reach:0};
   return {
     breath:Math.sin(time*1.35+seat*.93)*.0022,
-    head:Math.sin(time*.55+seat*1.7)*.008+(active?.009:0),
-    lean:status==='pickup'?.018:status==='play'?.012:status==='refill'?.009:won?-.008:active?.004:0,
+    head:Math.sin(time*.55+seat*1.7)*.008+(active?.009:0)+reaction*(reactionType==='surprise'?.022:-.014),
+    lean:(status==='pickup'?.018:status==='play'?.012:status==='refill'?.009:won?-.008:active?.004:0)-reaction*.008,
     reach:status==='pickup'?1:status==='play'?.8:status==='refill'?.45:0,
   };
 }

@@ -7,6 +7,7 @@ import { animateStep } from './motion.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
 import * as net from './net.js';
 import { createVoice } from './voice.js';
+import { createOnlineSignalControls } from './online-signals.js';
 
 const $ = id => document.getElementById(id);
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
@@ -27,6 +28,7 @@ let voice = null, voiceState = 'off', speakingIds = new Set();
 // Pending intents
 let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
+const signalControls = createOnlineSignalControls({ container: document.querySelector('.hand-zone'), onError: toast });
 let characterRoom = { update(...args) { latestCharacterState = args; } };
 import('./characters.js').then(({ CharacterRoom }) => {
   characterRoom = new CharacterRoom($('character-room'));
@@ -206,7 +208,7 @@ function render(sceneArg = scene, motion = null) {
   $('live-move').hidden = !liveMove;
   renderHand(sceneArg);
   if (motion?.player === 0 && motion.beforeCounts && ['pickup','refill'].includes(motion.type)) $('hand-count').textContent = `${motion.beforeCounts[0]} cards`;
-  renderActions(); renderDiscussion(sceneArg); renderLobby(); renderHeader(); renderTimer();
+  renderActions(); renderDiscussion(sceneArg); renderLobby(); renderHeader(); renderTimer(); signalControls.render();
 }
 function escapeHtml(text) { return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
@@ -321,12 +323,14 @@ function enterRoom(result) {
     if (!isConnected && error && ['UNAUTHORIZED', 'ROOM_NOT_FOUND', 'ROOM_CLOSED'].includes(error.code)) { leaveLocally('That table is no longer open.'); return; }
     if (!animating) render(); else rosterDirty = true;
   });
+  signalControls.connect(client);
   voice = createVoice({ requestToken: () => client.request('voice:token', {}) });
   voice.onState(state => { voiceState = state; renderHeader(); if (state === 'error') toast('Voice could not connect. Check microphone permission and try again.'); });
   voice.onSpeakers(ids => { speakingIds = new Set(ids); applySpeaking(); });
   render();
 }
 function leaveLocally(message) {
+  signalControls.close();
   if (session) net.clearSession(session.code);
   client?.close(); client = null;
   voice?.leave(); voice = null; voiceState = 'off'; speakingIds = new Set();

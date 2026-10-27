@@ -1,0 +1,124 @@
+<!doctype html><meta charset="utf-8"><title>Practice table layout checks</title>
+<style>body{margin:0;background:#eee;color:#222;font:14px system-ui}header{position:sticky;top:0;z-index:2;background:#fff;padding:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}button,select{padding:8px}iframe{display:block;border:0;margin:12px auto;background:#17130f}pre{white-space:pre-wrap;margin:15px}#output{max-height:180px;overflow:auto}</style>
+<header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>700</option><option>1440</option></select></label><label>Scenario <select id="scenario"><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
+<pre id="output"></pre><iframe id="game" title="Practice table preview" width="390" height="1150"></iframe>
+<script type="module">
+import {createDeck,createMatch,RANKS} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'), report=document.querySelector('#output'), status=document.querySelector('#status');
+const cards=createDeck(),card=(suit,rank)=>cards.find(c=>c.suit===suit&&c.rank===rank), joker=color=>cards.find(c=>c.color===color);
+const h=r=>card('hearts',r),s=r=>card('spades',r),d=r=>card('diamonds',r),b=r=>card('clubs',r);
+let errors=[];
+function fixture(kind){
+ const targets=kind==='defense'?[s('7'),h('7'),b('7')]:kind==='five'?[s('7'),d('7'),b('7'),s('8'),d('8')]:RANKS.slice(0,7).map(s);
+ let own=kind==='defense'?[h('8'),s('8'),b('8'),d('9')]:kind==='five'?['9','10','J','Q','K'].map(h):[s('3')];
+ let pile=targets,reserve=kind==='sleep'?[joker('red')]:[];
+ if(kind==='pickup'){pile=cards.filter(c=>!own.includes(c)).slice(0,12);}
+ const used=new Set([...pile,...own,...reserve].map(c=>c.id)),pool=cards.filter(c=>!used.has(c.id));
+ const hands=[own,...Array.from({length:7},()=>[pool.shift()])];hands[7].push(...pool);
+ return {...createMatch(cards,0),hands,reserve,table:{pile,highest:kind==='pickup'?pile.slice(-3):['defense','five'].includes(kind)?targets:targets.slice(-1)}};
+}
+function waitFor(check,label='condition',timeout=5000){return new Promise((resolve,reject)=>{const start=performance.now();function poll(){try{if(check())return resolve();}catch{}if(performance.now()-start>timeout)return reject(new Error('Timed out: '+label));setTimeout(poll,20);}poll();});}
+function saveState(state){localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,byRank:false,signals:[]}));}
+async function load(kind='defense',width=390,focus=true,extra={},flags={}){
+ frame.width=width;saveState(fixture(kind));localStorage.setItem('naiman-gar-table-preferences-v1',JSON.stringify({sound:false,motion:true,focus,...extra}));
+ const loaded=new Promise(resolve=>frame.onload=resolve);
+ if(Object.keys(flags).length){
+  const html=await (await fetch('../dist/practice.html')).text();
+  let shim='';
+  if(flags.noWebGL)shim+=`const getContext=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type.includes('webgl')?null:getContext.call(this,type,...args);};`;
+  if(flags.reduced)shim+=`const originalMedia=window.matchMedia;window.matchMedia=query=>{const media=originalMedia(query);if(query.includes('prefers-reduced-motion'))Object.defineProperty(media,'matches',{value:true});return media;};`;
+  if(flags.noAudio)shim+=`window.AudioContext=class{constructor(){throw new Error('Audio unavailable in test')}};`;
+  frame.srcdoc=html.replace('<head>',`<head><base href="${new URL('../dist/',location.href)}"><script>${shim}<\/script>`);
+ }else{frame.removeAttribute('srcdoc');frame.src='../dist/practice.html?qa='+Date.now();}
+ await loaded;
+ await waitFor(()=>frame.contentDocument.querySelector('#pause')?.textContent==='Resume','practice module');
+ frame.contentWindow.addEventListener('error',e=>errors.push(e.message));
+ frame.contentWindow.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
+ return frame.contentDocument;
+}
+const assert=(condition,message)=>{if(!condition)throw new Error(message);report.textContent+='✓ '+message+'\n';};
+const rect=node=>node.getBoundingClientRect();
+async function run(){
+ report.textContent='';errors=[];status.textContent='Running…';document.querySelector('#run').disabled=true;
+ try{
+  for(const width of [320,390,700,1440]){
+   const doc=await load('defense',width);const win=frame.contentWindow;
+   assert(doc.documentElement.scrollWidth<=width,`${width}px: no horizontal page overflow`);
+   assert(doc.querySelectorAll('#seats .team-mark').length===8,`${width}px: all eight team symbols`);
+   assert(doc.querySelector('#team-summary').textContent.includes('Last card'),`${width}px: one-card teammate visible`);
+   if(width<=700){
+    assert(win.getComputedStyle(doc.querySelector('#character-room')).display==='none',`${width}px: portraits collapsed`);
+    assert(rect(doc.querySelector('.hand .card')).width>=83,`${width}px: enlarged hand cards`);
+    assert(rect(doc.querySelector('#play')).height>=48,`${width}px: large play target`);
+    doc.querySelector('#focus-table').click();await waitFor(()=>!doc.body.classList.contains('focus-table'));
+    assert(win.getComputedStyle(doc.querySelector('#character-room')).display!=='none',`${width}px: portraits restore`);
+    assert(doc.documentElement.scrollWidth<=width,`${width}px: room view has no page overflow`);
+    doc.querySelector('#focus-table').click();
+   }else assert(!doc.body.classList.contains('focus-table'),'desktop ignores saved mobile focus');
+   doc.querySelector('#pause').click();
+   for(const card of [h('8'),s('8'),b('8')])doc.querySelector(`[data-card-id="${CSS.escape(card.id)}"]`).click();
+   assert(doc.querySelectorAll('.defense-pair.covered').length===3,`${width}px: rearranged defense covers all targets`);
+   assert(!doc.querySelector('#play').disabled,`${width}px: valid defense enables Play`);
+   doc.querySelector('#sort').click();assert(doc.querySelectorAll('#hand .selected').length===3,`${width}px: sorting preserves selections`);
+   if(width<=700){doc.querySelector('#focus-table').click();doc.querySelector('#focus-table').click();assert(doc.querySelectorAll('#hand .selected').length===3,`${width}px: layout toggle preserves selections`);}
+   doc.querySelector('#pause').click();
+  }
+  let doc=await load('five',320);doc.querySelector('#pause').click();
+  for(const c of ['9','10','J','Q','K'].map(h))doc.querySelector(`[data-card-id="${CSS.escape(c.id)}"]`).click();
+  assert(doc.querySelectorAll('.defense-pair.covered').length===5,'five-card defense covers every target despite short opponent hands');
+  assert(doc.documentElement.scrollWidth<=320,'five enlarged targets fit a 320px screen');
+  doc=await load('sleep',390);doc.querySelector('#pause').click();
+  assert(doc.querySelector('#sleep-label').textContent.includes('7/8'),'restored chain shows 7/8');
+  assert(doc.querySelector('.seat-1 .turn-marker').textContent==='After pickup','seventh-play next seat is conditional');
+  doc.querySelector(`[data-card-id="${CSS.escape(s('3').id)}"]`).click();doc.querySelector('#play').click();
+  await waitFor(()=>doc.querySelector('#card-motion').dataset.motion==='sleep','sleep animation');
+  assert(doc.querySelector('#sleep-label').textContent.includes('8/8'),'sleep animation shows 8/8');
+  await waitFor(()=>doc.querySelector('#sleep-label').textContent.includes('0/8')&&!doc.querySelector('#hint').disabled,'sleep settles');
+  assert(doc.querySelector('.seat-0 .turn-marker').textContent==='Playing','eighth actor retains lead after refill');
+  assert(doc.querySelector('#team-summary').textContent.includes('You 1'),'summary reflects reserve draw before victory');
+  doc=await load('win',390);doc.querySelector('#pause').click();doc.querySelector(`[data-card-id="${CSS.escape(s('3').id)}"]`).click();doc.querySelector('#play').click();
+  await waitFor(()=>doc.querySelector('#round-dialog').open,'round win');
+  assert(doc.querySelectorAll('.next-seat').length===0,'victory removes next-turn guidance');assert(doc.querySelector('#sleep-meter').hidden,'completed round hides meter');
+  doc=await load('pickup',390);doc.querySelector('#pause').click();doc.querySelector('#pickup').click();
+  await waitFor(()=>doc.querySelector('#card-motion').dataset.motion==='pickup','pickup animation');
+  doc.querySelector('#focus-table').click();await waitFor(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false','cancelled motion');
+  doc.querySelector('#pause').click();assert(doc.querySelectorAll('.flying-card').length===0,'layout change cleans up flying cards');
+  assert(doc.querySelectorAll('#hand .card').length===13,'pickup cancellation preserves committed hand');
+  doc.querySelector('#focus-table').click();
+  const hand=doc.querySelector('#hand');hand.scrollLeft=hand.scrollWidth;
+  const scroll=hand.scrollLeft;doc.querySelector('#sort').click();assert(Math.abs(hand.scrollLeft-scroll)<2,'large-hand sorting preserves scroll position');
+  // Layout-only stress: legal games normally end before any hand can hold all 43 cards.
+  const template=hand.firstElementChild;while(hand.children.length<43)hand.append(template.cloneNode(true));
+  assert(doc.documentElement.scrollWidth<=390&&hand.scrollWidth>hand.clientWidth,'43-card layout scrolls within the hand');
+  for(const node of doc.querySelectorAll('.seat-name'))node.firstChild.textContent='Long teammate name';
+  assert(doc.documentElement.scrollWidth<=390,'long roster names wrap without page overflow');
+  doc=await load('defense',390,true,{motion:false});doc.querySelector('#pause').click();
+  for(const c of [h('8'),s('8'),b('8')])doc.querySelector(`[data-card-id="${CSS.escape(c.id)}"]`).click();doc.querySelector('#play').click();
+  await waitFor(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false');
+  assert(doc.querySelectorAll('.flying-card').length===0,'motion-off applies result without flying cards');doc.querySelector('#pause').click();
+  doc.querySelector('#atmosphere-open').click();assert(doc.querySelector('#atmosphere-dialog').open,'settings dialog opens above controls');
+  assert(!doc.querySelector('#sound-enabled').checked&&!doc.querySelector('#motion-enabled').checked,'independent preferences restored');
+  doc.querySelector('#atmosphere-dialog [data-close]').click();
+  // Rotate across the mobile breakpoint without resetting the current selection.
+  doc=await load('defense',390);doc.querySelector('#pause').click();doc.querySelector(`[data-card-id="${CSS.escape(h('8').id)}"]`).click();
+  frame.width=800;await waitFor(()=>!doc.body.classList.contains('focus-table'),'wide orientation');
+  frame.width=390;await waitFor(()=>doc.body.classList.contains('focus-table'),'portrait orientation');
+  assert(doc.querySelectorAll('#hand .selected').length===1,'orientation changes preserve selection and restore focus preference');
+  doc=await load('defense',390,false,{sound:true},{noWebGL:true,noAudio:true,reduced:true});
+  await waitFor(()=>doc.querySelector('#character-room').dataset.renderer==='fallback','static fallback');
+  assert(doc.querySelectorAll('.character-fallback img').length===7,'unavailable WebGL preserves all seven static portraits');
+  assert(doc.querySelector('#motion-enabled').disabled&&!doc.querySelector('#motion-enabled').checked,'device reduced motion takes priority over saved preference');
+  doc.querySelector('#pause').dispatchEvent(new frame.contentWindow.PointerEvent('pointerdown',{bubbles:true}));
+  doc.querySelector('#pause').click();doc.querySelector(`[data-card-id="${CSS.escape(h('8').id)}"]`).click();
+  assert(doc.querySelectorAll('.defense-pair.covered').length===1,'preview works without WebGL or audio');
+  assert(errors.length===0,'no browser errors or unhandled rejections');
+  status.textContent='All browser checks passed';
+  await load('defense',390);frame.contentDocument.querySelector('#pause').click();
+  for(const c of [h('8'),s('8')])frame.contentDocument.querySelector(`[data-card-id="${CSS.escape(c.id)}"]`).click();
+ }catch(error){status.textContent='Failed';report.textContent+='✗ '+error.stack+'\n';}finally{document.querySelector('#run').disabled=false;}
+}
+document.querySelector('#run').onclick=run;
+document.querySelector('#clean').onclick=()=>{document.querySelector('header').hidden=true;report.hidden=true;frame.style.margin='0 auto';window.scrollTo(0,0);frame.contentWindow.scrollTo(0,0);};
+document.querySelector('#load').onclick=()=>load(document.querySelector('#scenario').value,Number(document.querySelector('#width').value));
+await load();
+</script>

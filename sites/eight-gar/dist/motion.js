@@ -16,9 +16,9 @@ function destination(step,i){
   if(step.player===0)return ownCard(step.cards[i].id);
   return backs(step.player)[step.before.hands[step.player].length+i];
 }
-export async function animateStep(step,{render,cardElement,signal}) {
+export async function animateStep(step,{render,cardElement,signal,motionEnabled=true}) {
   if(signal.aborted)return;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){render(step.after,null);return;}
+  if(!motionEnabled||matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){render(step.after,null);return;}
   const sources=step.cards.map((_,i)=>rect(source(step,i))||fallback());
   render(step.after,{type:step.type,player:step.player,beforeCounts:step.before.hands.map(h=>h.length)});
   const targets=step.cards.map((_,i)=>step.type==='sleep'?null:destination(step,i));
