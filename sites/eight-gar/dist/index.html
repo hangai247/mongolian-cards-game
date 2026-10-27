@@ -31,17 +31,18 @@
           <div class="welcome lobby" id="welcome">
             <div id="lobby-entry">
               <div class="welcome-suits" aria-hidden="true">✦</div><span class="eyebrow">МАНАЙ ШИРЭЭНД ТАВТАЙ МОРИЛ</span><h2>Сайхан нөхөд.<br>Сонирхолтой тоглоом.</h2>
-              <p>Найман суудал. Хоёр баг. Нэг дуут суваг. Ширээ нээж долоон найздаа холбоосыг илгээгээрэй. Эсвэл сул суудлыг компьютер тоглогчоор дүүргэж болно.</p>
+              <p id="lobby-intro">Найман суудал. Хоёр баг. Нэг дуут суваг. Ширээ нээж долоон найздаа холбоосыг илгээгээрэй. Эсвэл сул суудлыг компьютер тоглогчоор дүүргэж болно.</p>
               <label class="lobby-label" for="lobby-name">Тоглоомд харагдах нэр</label>
               <input id="lobby-name" class="lobby-input" maxlength="20" autocomplete="nickname" placeholder="Жишээ нь: Бат">
               <div class="lobby-actions"><button class="button light" id="create">Шинэ ширээ нээх <span aria-hidden="true">→</span></button></div>
-              <div class="lobby-join"><label class="lobby-label" for="lobby-code">Эсвэл ширээний кодоор нэгдэх</label><div class="lobby-row"><input id="lobby-code" class="lobby-input code" maxlength="8" placeholder="ABC234" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="quiet-button" id="join">Нэгдэх</button></div></div>
+              <div class="lobby-join"><label class="lobby-label" for="lobby-code" id="lobby-code-caption">Эсвэл ширээний кодоор нэгдэх</label><div class="lobby-row"><input id="lobby-code" class="lobby-input code" maxlength="8" placeholder="ABC234" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="quiet-button" id="join">Нэгдэх</button></div></div>
               <a class="text-button" href="/practice.html">Компьютертой дадлага хийх →</a><small id="lobby-error" class="lobby-error" role="alert"></small>
             </div>
             <div id="lobby-room" hidden>
               <span class="eyebrow">ШИРЭЭ <b id="lobby-code-label"></b></span><h2 id="lobby-title">Тоглогчид цуглаж байна</h2>
               <p id="lobby-copy">Найзууддаа холбоосыг илгээж суудалд урь. Багийг суудал тогтооно: сондгой суудлууд нэг баг, тэгш суудлууд нөгөө баг. Сул суудал дээр дарж шилжинэ, эсвэл «Энэ багт шилжих» товчоор багаа солино.</p>
               <div class="share-row"><input id="share-link" class="lobby-input" readonly aria-label="Ширээний холбоос"><button class="quiet-button" id="share-copy">Хуулах</button></div>
+              <div class="lobby-voice" id="lobby-voice" hidden><button class="quiet-button voice-button muted" id="lobby-mic" type="button" aria-pressed="false"></button><small id="lobby-voice-note"></small></div>
               <div class="team-groups" id="seat-list" aria-label="Багууд ба суудлууд"></div>
               <div class="lobby-actions host-actions" id="host-actions" hidden><button class="quiet-button" id="fill-bots">Компьютероор дүүргэх</button><button class="button light" id="start-game" disabled>Хөзөр тараах <span aria-hidden="true">→</span></button></div>
               <small id="lobby-status"></small>

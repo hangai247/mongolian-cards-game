@@ -228,17 +228,25 @@ function renderHeader() {
   if (session) $('room-code').textContent = session.code;
   $('conn-status').hidden = !session || connected;
   const voiceOn = !!room?.config?.voice && !!session;
-  const button = $('voice-mic');
-  button.hidden = !voiceOn;
-  button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
+  // The same microphone toggle appears at the table and in the lobby, so a player can unmute before the deal.
   const icon = voiceInfo.state === 'connecting' ? 'loading' : voiceInfo.micOn ? 'mic' : 'micOff';
   const label = voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна' : voiceInfo.state === 'error' ? 'Дуут холболт тасарсан'
     : voiceInfo.micBlocked ? 'Микрофон хаагдсан · дахин оролдох' : voiceInfo.micOn ? 'Микрофон асаалттай' : 'Микрофон хаалттай';
   const title = voiceInfo.state !== 'on' ? 'Дуут сувагт автоматаар дахин холбогдоно' : voiceInfo.micBlocked ? 'Хөтөчдөө микрофон ашиглахыг зөвшөөрөөд дахин дарна уу'
     : voiceInfo.micOn ? 'Дарж микрофоноо хаана уу' : 'Та бусдыг сонсож байна. Ярихын тулд дарж микрофоноо асаана уу';
-  button.innerHTML = `${controlIcon(icon)} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
-  button.disabled = voiceInfo.state === 'connecting';
+  for (const button of [$('voice-mic'), $('lobby-mic')]) {
+    button.hidden = !voiceOn;
+    button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
+    button.innerHTML = `${controlIcon(icon)} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
+    button.disabled = voiceInfo.state === 'connecting';
+  }
   $('audio-banner').hidden = !voiceOn || !voiceInfo.audioBlocked || voiceInfo.state !== 'on';
+  $('lobby-voice').hidden = !voiceOn;
+  $('lobby-voice-note').textContent = voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна…'
+    : voiceInfo.state === 'error' ? 'Дуут суваг түр тасарлаа. Автоматаар дахин холбогдоно.'
+    : voiceInfo.audioBlocked ? 'Хөтөч дууг хаасан байна. Товчийг дарж бусдыг сонсоно.'
+    : voiceInfo.micOn ? 'Багийнхан таныг сонсож байна. Дарж микрофоноо хаана.'
+    : 'Та бусдыг сонсож байна. Ярихын тулд микрофоноо асаана уу.';
 }
 /** 🎙 live microphone, 🔇 in the voice channel but muted, nothing when not connected to voice. */
 function micBadge(info, display) {
@@ -287,6 +295,18 @@ function applySpeaking() {
 
 // ---- Lobby ----
 function codeFromUrl() { const match = location.pathname.match(/^\/r\/([A-Za-z0-9-]{4,16})/); return match ? match[1].toUpperCase().replace(/[^A-Z0-9]/g, '') : ''; }
+/** An invitation link already names the table, so the entry form only asks for a name and offers Join. */
+function setEntryMode(code) {
+  const joining = !!code;
+  $('lobby-entry').classList.toggle('joining', joining);
+  $('lobby-code').value = code;
+  $('lobby-intro').textContent = joining
+    ? 'Таныг ширээнд урьсан байна. Нэрээ оруулаад суудалдаа нэгдээрэй. Найман суудал, хоёр баг, нэг дуут суваг.'
+    : 'Найман суудал. Хоёр баг. Нэг дуут суваг. Ширээ нээж долоон найздаа холбоосыг илгээгээрэй. Эсвэл сул суудлыг компьютер тоглогчоор дүүргэж болно.';
+  $('lobby-code-caption').textContent = joining ? 'Ширээний код' : 'Эсвэл ширээний кодоор нэгдэх';
+  $('join').className = joining ? 'button light' : 'quiet-button';
+  $('join').innerHTML = joining ? 'Ширээнд нэгдэх <span aria-hidden="true">→</span>' : 'Нэгдэх';
+}
 function renderLobby() {
   const inRoom = !!session && !!room;
   $('lobby-entry').hidden = inRoom;
@@ -403,7 +423,7 @@ function leaveLocally(message) {
   deadline = null; timerKind = null; reviewUntil = null; liveMove = ''; selected.clear(); pendingAction = null;
   if ($('round-dialog').open) $('round-dialog').close();
   history.replaceState(null, '', '/');
-  $('lobby-code').value = '';
+  setEntryMode('');
   render();
   if (message) toast(message);
 }
@@ -609,6 +629,7 @@ $('lobby-leave').addEventListener('click', async () => { if (client) { try { awa
 $('new-match').addEventListener('click', () => { if (!session) return; if (scene) openDialog('new-dialog'); else $('lobby-leave').click(); });
 $('new-confirm').addEventListener('click', async () => { $('new-dialog').close(); if (client) { try { await client.request('room:leave', {}); } catch { /* leaving anyway */ } } leaveLocally('Та ширээнээс гарлаа. Ижил холбоосоор буцаж орж болно.'); });
 $('voice-mic').addEventListener('click', toggleMic);
+$('lobby-mic').addEventListener('click', toggleMic);
 $('audio-resume').addEventListener('click', async () => { await voice?.resumeAudio(); renderHeader(); });
 $('sort').addEventListener('click', () => { byRank = !byRank; store(SORT_KEY, byRank ? '1' : '0'); if (scene) renderHand(); });
 $('play').addEventListener('click', () => { if (scene?.turn === 0 && selected.size) commit({ type: 'play', cards: [...selected] }); });
@@ -622,7 +643,7 @@ $('hint').addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) motionController?.abort(); });
 window.addEventListener('resize', () => motionController?.abort());
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => motionController?.abort());
-window.addEventListener('popstate', () => { if (!session && codeFromUrl()) $('lobby-code').value = codeFromUrl(); });
+window.addEventListener('popstate', () => { if (!session) setEntryMode(codeFromUrl()); });
 
 // ---- Boot ----
 byRank = read(SORT_KEY) === '1';
@@ -632,7 +653,7 @@ $('lobby-name').value = read(NAME_KEY) || '';
   const saved = code ? net.loadSession(code) : null;
   if (saved && saved.code === code) enterRoom(saved);
   else {
-    if (code) $('lobby-code').value = code;
+    setEntryMode(code);
     render();
     ($('lobby-name').value ? (code ? $('join') : $('create')) : $('lobby-name')).focus({ preventScroll: true });
   }
