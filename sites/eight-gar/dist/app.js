@@ -228,11 +228,11 @@ function renderHeader() {
   const button = $('voice-mic');
   button.hidden = !voiceOn;
   button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
-  const label = voiceInfo.state === 'connecting' ? '… Joining voice' : voiceInfo.state === 'error' ? '🔇 Voice offline'
-    : voiceInfo.micBlocked ? '🎙 Mic blocked · retry' : voiceInfo.micOn ? '🎙 Mic on' : '🔇 Muted';
+  const [icon, label] = voiceInfo.state === 'connecting' ? ['…', 'Joining voice'] : voiceInfo.state === 'error' ? ['🔇', 'Voice offline']
+    : voiceInfo.micBlocked ? ['🎙', 'Mic blocked · retry'] : voiceInfo.micOn ? ['🎙', 'Mic on'] : ['🔇', 'Muted'];
   const title = voiceInfo.state !== 'on' ? 'Voice reconnects automatically' : voiceInfo.micBlocked ? 'Allow the microphone in your browser, then click to retry'
     : voiceInfo.micOn ? 'Click to mute yourself' : 'You can hear the table. Click to unmute and talk';
-  button.textContent = label; button.title = title; button.setAttribute('aria-pressed', String(voiceInfo.micOn));
+  button.innerHTML = `${icon} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
   button.disabled = voiceInfo.state === 'connecting';
   $('audio-banner').hidden = !voiceOn || !voiceInfo.audioBlocked || voiceInfo.state !== 'on';
 }
