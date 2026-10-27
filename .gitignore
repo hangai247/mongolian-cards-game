@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output of the root engine (sites/eight-gar/dist is hand-written site source and stays tracked)
+/dist/
+
+# Release archives
+/output/
+
+# Backup of the former nested ChatGPT Sites git repository (not part of this repo's history)
+sites/eight-gar/.git-nested-backup/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

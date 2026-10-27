@@ -1,0 +1,17 @@
+{
+  "name": "mongolian-eight-gar-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless Mongolian 8 гар rules engine with atomic automatic reserve refill",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": { "types": "./dist/engine.d.ts", "import": "./dist/engine.js" } },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "demo": "npm run build && node examples/demo.mjs",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}
