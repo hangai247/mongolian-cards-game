@@ -7,7 +7,6 @@ import { layoutTablePile } from './viewport-table.js?v=ger3';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
 import { RANKS, SUITS, JOKERS, applyAction, canLeadThree, canLeadFive } from './engine.js';
-import { findPlay } from './strategy.js';
 import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
@@ -114,7 +113,6 @@ function renderActions() {
   const error = active ? playError() : null;
   $('play').disabled = !active || selected.size === 0 || !!error || !!pendingAction;
   $('pickup').disabled = !active || scene.table.pile.length === 0 || !!pendingAction;
-  $('hint').disabled = !active;
   setActionButton($('play'), 'Тавих', 'chevron', true);
   $('play').setAttribute('aria-label', selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
   document.body.dataset.selection = String(selected.size);
@@ -634,12 +632,6 @@ $('audio-resume').addEventListener('click', async () => { await voice?.resumeAud
 $('sort').addEventListener('click', () => { byRank = !byRank; store(SORT_KEY, byRank ? '1' : '0'); if (scene) renderHand(); });
 $('play').addEventListener('click', () => { if (scene?.turn === 0 && selected.size) commit({ type: 'play', cards: [...selected] }); });
 $('pickup').addEventListener('click', () => { if (scene?.turn === 0) commit({ type: 'pickup' }); });
-$('hint').addEventListener('click', () => {
-  if (scene?.turn !== 0) return;
-  const cards = findPlay(scene); selected = new Set(cards || []); renderHand(); renderActions();
-  if (!cards) toast('Дарах хөзөр алга. Ширээний хөзрийг аваарай.');
-  else toast(`Санал болгосон ${cards.length} хөзрийг сонголоо. Тавих эсэхээ та шийдээрэй.`);
-});
 document.addEventListener('visibilitychange', () => { if (document.hidden) motionController?.abort(); });
 window.addEventListener('resize', () => motionController?.abort());
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => motionController?.abort());

@@ -36,9 +36,8 @@ const voice=document.querySelector('.voice-dock');if(voice)utility.prepend(voice
 document.querySelector('.hand-zone').append(utility);
 $('sort').setAttribute('aria-label','Хөзрөө эрэмбэлэх');
 setActionButton($('sort'),'Эрэмбэлэх','sort');
-$('hint').setAttribute('aria-label','Санал авах');
-$('hint').title='Санал авах';
-$('hint').innerHTML=icons.hint+'<span>Санал</span>';
+// Only the practice table offers suggestions; the online table has no hint button.
+if($('hint')){$('hint').setAttribute('aria-label','Санал авах');$('hint').title='Санал авах';$('hint').innerHTML=icons.hint+'<span>Санал</span>';}
 // Settings is a real dialog: rules and existing new-match/leave controls remain reachable.
 const settings=document.createElement('dialog');settings.id='table-settings';settings.setAttribute('aria-labelledby','settings-title');
 settings.innerHTML='<div class="dialog-top"><span class="eyebrow">8 ГАР · ШИРЭЭ</span><button class="close-button" aria-label="Хаах">×</button></div><h2 id="settings-title">Ширээний тохиргоо</h2><div class="settings-actions"></div>';

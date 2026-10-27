@@ -8,7 +8,7 @@ const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;awa
 function check(width,height,label){
  const doc=frame.contentDocument;
  assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,label+': page fits');
- for(const id of ['rules-open','new-match','copy-link','invite-friend','voice-mic','signals-toggle','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup','hint']){
+ for(const id of ['rules-open','new-match','copy-link','invite-friend','voice-mic','signals-toggle','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup']){
   const node=doc.getElementById(id);if(!node||!node.getClientRects().length)continue;const box=node.getBoundingClientRect();
   assert(box.width>0&&box.height>0&&box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height+1,label+': '+id+' visible');
  }
