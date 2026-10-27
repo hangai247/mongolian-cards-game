@@ -25,7 +25,8 @@ let pendingUpdates = [], processing = false;
 // Timers from the server (epoch ms on the server clock)
 let deadline = null, timerKind = null, reviewUntil = null;
 // Voice
-let voice = null, voiceState = 'off', speakingIds = new Set();
+let voice = null, voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }, speakingIds = new Set(), voiceMembers = new Map();
+const MIC_KEY = 'gar:mic';
 // Pending intents
 let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
@@ -168,7 +169,8 @@ function render(sceneArg = scene, motion = null) {
     seat.className = `seat seat-${index} ${index % 2 ? 'theirs' : 'ours'}${active ? ' active' : ''}${winning ? ' celebrating' : ''}${offline ? ' offline' : ''}${info?.kind === 'bot' ? ' bot' : ''}${speaking ? ' speaking' : ''}`;
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'other' : 'your'} team, ${shownCount} cards${active ? ', current turn' : ''}${offline ? ', offline' : ''}`);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Y' : names[index].slice(0, 1)}</div><div><span class="seat-name">${escapeHtml(names[index])}</span><span class="seat-meta"><span class="seat-back" aria-hidden="true"></span> ${shownCount} cards</span></div><span class="player-status">${status}</span>`;
+    const mic = micBadge(info, index);
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Y' : names[index].slice(0, 1)}</div><div><span class="seat-name">${escapeHtml(names[index])}${mic}</span><span class="seat-meta"><span class="seat-back" aria-hidden="true"></span> ${shownCount} cards</span></div><span class="player-status">${status}</span>`;
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${names[index]} holds ${shownCount} face-down cards`);
@@ -223,12 +225,34 @@ function renderHeader() {
   if (session) $('room-code').textContent = session.code;
   $('conn-status').hidden = !session || connected;
   const voiceOn = !!room?.config?.voice && !!session;
-  $('voice-join').hidden = !voiceOn || voiceState === 'on' || voiceState === 'connecting';
-  $('voice-mute').hidden = !voiceOn || voiceState !== 'on';
-  $('voice-join').textContent = voiceState === 'error' ? '🎙 Retry voice' : '🎙 Join voice';
-  $('voice-join').classList.toggle('on', voiceState === 'connecting');
-  $('voice-mute').textContent = voice?.muted ? 'Unmute' : 'Mute';
-  $('voice-mute').classList.toggle('muted', !!voice?.muted);
+  const button = $('voice-mic');
+  button.hidden = !voiceOn;
+  button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
+  const label = voiceInfo.state === 'connecting' ? '… Joining voice' : voiceInfo.state === 'error' ? '🔇 Voice offline'
+    : voiceInfo.micBlocked ? '🎙 Mic blocked · retry' : voiceInfo.micOn ? '🎙 Mic on' : '🔇 Muted';
+  const title = voiceInfo.state !== 'on' ? 'Voice reconnects automatically' : voiceInfo.micBlocked ? 'Allow the microphone in your browser, then click to retry'
+    : voiceInfo.micOn ? 'Click to mute yourself' : 'You can hear the table. Click to unmute and talk';
+  button.textContent = label; button.title = title; button.setAttribute('aria-pressed', String(voiceInfo.micOn));
+  button.disabled = voiceInfo.state === 'connecting';
+  $('audio-banner').hidden = !voiceOn || !voiceInfo.audioBlocked || voiceInfo.state !== 'on';
+}
+/** 🎙 live microphone, 🔇 in the voice channel but muted, nothing when not connected to voice. */
+function micBadge(info, display) {
+  if (!room?.config?.voice || !info || info.kind !== 'human') return '';
+  const member = display === 0 ? (voiceInfo.state === 'on' ? { micOn: voiceInfo.micOn } : null) : voiceMembers.get(info.playerId) ?? null;
+  if (!member) return '';
+  return `<span class="seat-mic${member.micOn ? ' live' : ''}" title="${member.micOn ? 'Microphone on' : 'Muted'}" aria-label="${member.micOn ? 'microphone on' : 'muted'}">${member.micOn ? '🎙' : '🔇'}</span>`;
+}
+async function toggleMic() {
+  if (!voice) return;
+  if (voiceInfo.audioBlocked) await voice.resumeAudio();
+  const on = await voice.setMic(!voiceInfo.micWanted || voiceInfo.micBlocked ? true : false);
+  store(MIC_KEY, voice.micWanted ? '1' : '0');
+  if (voice.micWanted && !on && voiceInfo.micBlocked) toast('The browser blocked the microphone. Allow it for this site, then click the mic again.');
+}
+function maybeJoinVoice() {
+  if (!voice || !room?.config?.voice || voiceInfo.state !== 'off') return;
+  voice.join();
 }
 let lastTimerText = '';
 function renderTimer() {
@@ -281,7 +305,7 @@ function renderLobby() {
     row.className = `seat-row ${info.team === room.seats[me].team ? 'ours' : 'theirs'}${mine ? ' me' : ''}${info.kind === 'empty' ? ' empty' : ''}${info.kind === 'bot' ? ' bot' : ''}${clickable ? ' clickable' : ''}${info.playerId && speakingIds.has(info.playerId) ? ' speaking' : ''}`;
     row.dataset.seat = info.seat; row.dataset.display = display;
     const who = info.kind === 'empty' ? 'Empty seat' : mine ? `${info.name} (you)` : info.name;
-    const tags = [info.isHost ? 'Host' : '', info.kind === 'human' ? `<span class="${info.connected ? 'online' : 'offline'}">${info.connected ? 'Online' : 'Offline'}</span>` : ''].filter(Boolean).join(' · ');
+    const tags = [info.isHost ? 'Host' : '', info.kind === 'human' ? `<span class="${info.connected ? 'online' : 'offline'}">${info.connected ? 'Online' : 'Offline'}</span>` : '', micBadge(info, display)].filter(Boolean).join(' · ');
     row.innerHTML = `<span class="seat-no">${info.seat + 1}</span><span class="seat-who">${escapeHtml(who)}</span><span class="seat-tags">${tags}</span>`;
     if (clickable) { row.setAttribute('role', 'button'); row.tabIndex = 0; row.setAttribute('aria-label', `Move to seat ${info.seat + 1}`); row.addEventListener('click', () => lobbyRequest('room:move', { seat: info.seat })); row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lobbyRequest('room:move', { seat: info.seat }); } }); }
     if (room.you.isHost && (info.kind === 'empty' || (info.kind === 'bot' && !info.reservedForName))) {
@@ -329,16 +353,23 @@ function enterRoom(result) {
     if (!animating) render(); else rosterDirty = true;
   });
   signalControls.connect(client);
-  voice = createVoice({ requestToken: () => client.request('voice:token', {}) });
-  voice.onState(state => { voiceState = state; renderHeader(); if (state === 'error') toast('Voice could not connect. Check microphone permission and try again.'); });
+  voice = createVoice({ requestToken: () => client.request('voice:token', {}), micPreferred: read(MIC_KEY) === '1' });
+  let voiceWasOn = false;
+  voice.onState(info => {
+    voiceInfo = info; renderHeader();
+    if (info.state === 'on' && !voiceWasOn) { voiceWasOn = true; toast(info.micOn ? 'Voice on. Your microphone is live.' : 'Voice on. You can hear the table; unmute to talk.'); }
+    if (info.state === 'error') toast('Voice is offline, reconnecting…');
+    if (!animating) render();
+  });
   voice.onSpeakers(ids => { speakingIds = new Set(ids); applySpeaking(); });
+  voice.onParticipants(members => { voiceMembers = members; if (!animating) render(); });
   render();
 }
 function leaveLocally(message) {
   signalControls.close();
   if (session) net.clearSession(session.code);
   client?.close(); client = null;
-  voice?.leave(); voice = null; voiceState = 'off'; speakingIds = new Set();
+  voice?.leave(); voice = null; voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }; speakingIds = new Set(); voiceMembers = new Map();
   motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = []; processing = false;
   session = null; room = null; latestView = null; scene = null; me = 0; names = defaultNames(); connected = false;
   deadline = null; timerKind = null; reviewUntil = null; liveMove = ''; selected.clear(); pendingAction = null;
@@ -353,6 +384,7 @@ function updateNames() {
 }
 function onRoomState(payload) {
   room = payload; me = payload.you.seat; updateNames();
+  maybeJoinVoice();
   if (payload.game) {
     deadline = payload.game.deadline; timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
     const incoming = payload.game.view;
@@ -553,8 +585,8 @@ $('copy-link').addEventListener('click', () => { if (session) copyText(`${locati
 $('lobby-leave').addEventListener('click', async () => { if (client) { try { await client.request('room:leave', {}); } catch { /* leaving anyway */ } } leaveLocally('You left the table.'); });
 $('new-match').addEventListener('click', () => { if (!session) return; if (scene) openDialog('new-dialog'); else $('lobby-leave').click(); });
 $('new-confirm').addEventListener('click', async () => { $('new-dialog').close(); if (client) { try { await client.request('room:leave', {}); } catch { /* leaving anyway */ } } leaveLocally('You left the table. Open the same link to come back.'); });
-$('voice-join').addEventListener('click', () => voice?.join());
-$('voice-mute').addEventListener('click', async () => { if (voice) { await voice.toggleMute(); renderHeader(); } });
+$('voice-mic').addEventListener('click', toggleMic);
+$('audio-resume').addEventListener('click', async () => { await voice?.resumeAudio(); renderHeader(); });
 $('sort').addEventListener('click', () => { byRank = !byRank; store(SORT_KEY, byRank ? '1' : '0'); if (scene) renderHand(); });
 $('play').addEventListener('click', () => { if (scene?.turn === 0 && selected.size) commit({ type: 'play', cards: [...selected] }); });
 $('pickup').addEventListener('click', () => { if (scene?.turn === 0) commit({ type: 'pickup' }); });

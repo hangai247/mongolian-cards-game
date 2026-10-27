@@ -21,7 +21,7 @@ Reload or reopen the link at any time: the session token in this browser puts yo
 | `dist/app.js` | Table controller: lobby, server payloads → scene, animations, intents |
 | `dist/scene.js` | Pure rotation of the server `PlayerView` into the renderer's State-shaped scene (viewer at display seat 0, placeholders for hidden cards) |
 | `dist/net.js` | HTTP room endpoints, session storage, socket.io wrapper with acked requests and clock offset |
-| `dist/voice.js` | LiveKit audio-only wrapper (join on click, mute, active speakers, token refresh) |
+| `dist/voice.js` | LiveKit audio-only wrapper: voice joins automatically when you sit down (listening, mic muted), one button unmutes, per-seat mic badges, active speakers, a tap-to-hear prompt when the browser blocks autoplay, token refresh |
 | `dist/presentation.js`, `dist/motion.js`, `dist/characters.js`, `dist/character-layout.js` | Unchanged animation and 2.5D renderer; they receive only counts and public cards |
 | `dist/vendor/` | Three.js and livekit-client bundles with licenses |
 
