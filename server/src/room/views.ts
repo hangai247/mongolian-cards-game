@@ -3,6 +3,7 @@ import { TEAMS, viewForPlayer, type Event as EngineEvent } from 'mongolian-eight
 import type { Timing } from '../config.js';
 import type { ClientEvent, GameInfo, PublicRoomInfo, RoomStatePayload, SeatInfo } from '../protocol.js';
 import type { RoomSnapshot } from './model.js';
+import { reconcileSignals, signalsForPlayer } from 'mongolian-eight-gar-engine/signals';
 
 const BOT_NAMES = ['Temu', 'Bataa', 'Sarnai', 'Anu', 'Bold', 'Naraa', 'Oyu', 'Zaya'];
 export function botName(seat: number): string {
@@ -31,6 +32,7 @@ export function gameInfoFor(snapshot: RoomSnapshot, seat: number): GameInfo | nu
   const confirmer = confirmedBy?.playerId ? snapshot.players[confirmedBy.playerId] : null;
   return {
     view: viewForPlayer(game.state, seat),
+    signals: signalsForPlayer(reconcileSignals(game.state, game.signals), seat),
     deadline: game.deadline, timer: game.timer, reviewUntil: game.reviewUntil,
     leaderConfirmedBy: confirmedBy ? { seat: confirmedBy.seat, name: confirmer?.name ?? null } : null,
   };

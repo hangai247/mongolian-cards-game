@@ -4,14 +4,29 @@
   "private": true,
   "description": "Headless Mongolian 8 гар rules engine with atomic automatic reserve refill",
   "type": "module",
-  "engines": { "node": ">=22" },
-  "exports": {
-    ".": { "types": "./dist/engine.d.ts", "import": "./dist/engine.js" },
-    "./strategy": { "types": "./dist/strategy.d.ts", "import": "./dist/strategy.js" }
+  "engines": {
+    "node": ">=22"
   },
-  "workspaces": ["server", "sites/eight-gar"],
+  "exports": {
+    ".": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./strategy": {
+      "types": "./dist/strategy.d.ts",
+      "import": "./dist/strategy.js"
+    },
+    "./signals": {
+      "types": "./dist/signals.d.ts",
+      "import": "./dist/signals.js"
+    }
+  },
+  "workspaces": [
+    "server",
+    "sites/eight-gar"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-browser-modules.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",
     "demo": "npm run build && node examples/demo.mjs",
@@ -20,5 +35,7 @@
     "test:all": "npm test && npm test -w sites/eight-gar && npm test -w server",
     "start": "node server/dist/main.js"
   },
-  "devDependencies": { "typescript": "5.9.3" }
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
 }

@@ -6,6 +6,9 @@ import type { Repository } from '../db/repo.js';
 import { RoomError, type RoomSnapshot } from './model.js';
 import { applyCommand, RuleError, type Command, type Result } from './reducer.js';
 import { localizeEvents, roomStateFor } from './views.js';
+import { TEAMS } from 'mongolian-eight-gar-engine';
+import { reconcileSignals, signalsForPlayer } from 'mongolian-eight-gar-engine/signals';
+import type { SignalUpdatePayload } from '../protocol.js';
 
 export interface Clock {
   now(): number;
@@ -24,6 +27,7 @@ export interface SocketLike {
   readonly id: string;
   emit(event: 'room:state', payload: RoomStatePayload): void;
   emit(event: 'game:update', payload: GameUpdatePayload): void;
+  emit(event: 'game:signals', payload: SignalUpdatePayload): void;
   emit(event: 'room:closed', payload: RoomClosedPayload): void;
 }
 
@@ -52,7 +56,7 @@ export class RoomRuntime {
   private disposed = false;
 
   constructor(snapshot: RoomSnapshot, private readonly deps: RuntimeDeps) {
-    this.snapshot = snapshot;
+    this.snapshot = snapshot.game ? { ...snapshot, game: { ...snapshot.game, signals: reconcileSignals(snapshot.game.state, snapshot.game.signals) } } : snapshot;
     this.syncTimers();
   }
 
@@ -116,12 +120,24 @@ export class RoomRuntime {
   private emitResult(result: Result): void {
     const now = this.deps.clock.now();
     const game = this.snapshot.game;
+    if (result.signalTeam !== undefined && game) {
+      for (const [playerId, sockets] of this.sockets) {
+        const player = this.snapshot.players[playerId];
+        if (!player || this.snapshot.seats[player.seat]?.kind !== 'human' || TEAMS[player.seat] !== result.signalTeam) continue;
+        const payload: SignalUpdatePayload = {
+          version: this.snapshot.version, revision: game.state.revision,
+          signals: signalsForPlayer(reconcileSignals(game.state, game.signals), player.seat),
+        };
+        for (const socket of sockets) socket.emit('game:signals', payload);
+      }
+    }
     if (result.gameChanged && game) {
       for (const [playerId, sockets] of this.sockets) {
         const player = this.snapshot.players[playerId];
         if (!player || this.snapshot.seats[player.seat]?.kind !== 'human') continue;
         const payload: GameUpdatePayload = {
           version: this.snapshot.version,
+          signals: signalsForPlayer(reconcileSignals(game.state, game.signals), player.seat),
           view: roomStateFor(this.snapshot, playerId, now, this.deps.timing, this.deps.voiceEnabled)!.game!.view,
           events: [...result.roomEvents, ...localizeEvents(result.engineEvents, player.seat)],
           deadline: game.deadline, timer: game.timer, reviewUntil: game.reviewUntil, cause: result.cause, serverNow: now,

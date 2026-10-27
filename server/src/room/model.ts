@@ -1,4 +1,5 @@
 import type { State } from 'mongolian-eight-gar-engine';
+import type { Signals } from 'mongolian-eight-gar-engine/signals';
 import type { Cause, ErrorCode, TimerKind } from '../protocol.js';
 
 export type SeatSlot =
@@ -18,6 +19,7 @@ export interface Player {
 
 export interface GameMeta {
   /** Absent in older saved rooms; revalidate before use. */
+  readonly signals?: Signals;
   /** Full engine state. Never leaves the server; clients get viewForPlayer. */
   readonly state: State;
   /** When the current phase/turn began; deadlines derive from it. */

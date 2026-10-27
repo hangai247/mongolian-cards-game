@@ -19,7 +19,7 @@ function destination(step,i){
 export async function animateStep(step,{render,cardElement,signal,motionEnabled=true}) {
   if(signal.aborted)return;
   if(!motionEnabled||matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){render(step.after,null);return;}
-  const sources=step.cards.map((_,i)=>rect(source(step,i))||fallback());
+  const sources=step.cards.map((_,i)=>rect(source(step,i))||(step.type==='play'?rect(document.querySelector(`.seat-${step.player}`)):null)||fallback());
   render(step.after,{type:step.type,player:step.player,beforeCounts:step.before.hands.map(h=>h.length)});
   const targets=step.cards.map((_,i)=>step.type==='sleep'?null:destination(step,i));
   targets.forEach(n=>{if(n)n.style.visibility='hidden';});

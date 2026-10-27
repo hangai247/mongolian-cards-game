@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><title>Practice table layout checks</title>
-<style>body{margin:0;background:#eee;color:#222;font:14px system-ui}header{position:sticky;top:0;z-index:2;background:#fff;padding:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}button,select{padding:8px}iframe{display:block;border:0;margin:12px auto;background:#17130f}pre{white-space:pre-wrap;margin:15px}#output{max-height:180px;overflow:auto}</style>
+<style>[hidden]{display:none!important}body{margin:0;background:#eee;color:#222;font:14px system-ui}header{position:sticky;top:0;z-index:2;background:#fff;padding:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}button,select{padding:8px}iframe{display:block;border:0;margin:12px auto;background:#17130f}pre{white-space:pre-wrap;margin:15px}#output{max-height:180px;overflow:auto}</style>
 <header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>700</option><option>1440</option></select></label><label>Scenario <select id="scenario"><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
 <pre id="output"></pre><iframe id="game" title="Practice table preview" width="390" height="1150"></iframe>
 <script type="module">
@@ -111,7 +111,7 @@ async function run(){
   doc.querySelector('#pause').dispatchEvent(new frame.contentWindow.PointerEvent('pointerdown',{bubbles:true}));
   doc.querySelector('#pause').click();doc.querySelector(`[data-card-id="${CSS.escape(h('8').id)}"]`).click();
   assert(doc.querySelectorAll('.defense-pair.covered').length===1,'preview works without WebGL or audio');
-  assert(errors.length===0,'no browser errors or unhandled rejections');
+  assert(errors.length===0,'no uncaught browser errors or unhandled rejections');
   status.textContent='All browser checks passed';
   await load('defense',390);frame.contentDocument.querySelector('#pause').click();
   for(const c of [h('8'),s('8')])frame.contentDocument.querySelector(`[data-card-id="${CSS.escape(c.id)}"]`).click();

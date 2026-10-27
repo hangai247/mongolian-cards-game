@@ -188,7 +188,7 @@ function render(scene = state, motion = null) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${NAMES[index]} holds ${shownCount} face-down cards`);
       fan.style.setProperty('--hand-scale', count > 7 ? '.53' : '.72');
-      for (const card of fanLayout(shownCount)) {
+      for (const card of fanLayout(count)) {
         const back = document.createElement('span'); back.className = 'hand-back'; back.setAttribute('aria-hidden','true');
         back.style.setProperty('--back-x', `${card.x}px`); back.style.setProperty('--back-angle', `${card.angle}deg`);
         fan.append(back);
