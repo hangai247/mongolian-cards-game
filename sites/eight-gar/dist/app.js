@@ -109,7 +109,7 @@ const errorText = error => ERRORS[error?.code] || error?.message || 'The table h
 
 function renderActions() {
   const active = scene?.phase === 'playing' && scene.turn === 0 && !animating && connected;
-  for (const id of ['new-match', 'rules-open', 'resources-open', 'sort']) $(id).disabled = animating;
+  for (const id of ['new-match', 'rules-open', 'sort']) $(id).disabled = animating;
   $('felt').setAttribute('aria-busy', String(animating));
   const error = active ? playError() : null;
   $('play').disabled = !active || selected.size === 0 || !!error || !!pendingAction;
@@ -572,7 +572,7 @@ $('confirm-opener').addEventListener('click', () => { if (scene?.openingTeam ===
 $('continue').addEventListener('click', continueRound);
 $('round-dialog').addEventListener('cancel', event => event.preventDefault());
 function openDialog(id) { if (animating) return; $(id).showModal(); }
-for (const [button, dialog] of [['rules-open', 'rules-dialog'], ['resources-open', 'resources-dialog']]) $(button).addEventListener('click', () => openDialog(dialog));
+$('rules-open').addEventListener('click', () => openDialog('rules-dialog'));
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => button.closest('dialog').close());
 $('pile-open').addEventListener('click', () => { if (!scene) return; $('pile-cards').replaceChildren(...scene.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
 $('create').addEventListener('click', () => createOrJoin('create'));

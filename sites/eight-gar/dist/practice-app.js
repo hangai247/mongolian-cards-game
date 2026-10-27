@@ -120,7 +120,7 @@ function playError() {
 const ERRORS = { INVALID_LEAD: 'Lead 1 card, a pair + 1, or an eligible two-pair set of 5.', THREE_CARD_LEAD_BLOCKED: 'Three-card leads need all eight players to have at least three cards.', FIVE_CARD_LEAD_BLOCKED: 'Five-card leads need empty reserve and all eight hands at least five.', INVALID_RESPONSE: 'Match the table’s card count and beat every card. Jokers play alone.', INVALID_CARDS: 'Choose distinct cards from your hand.', WRONG_TURN: 'Wait for your turn.', ROUND_CLOSED: 'This round has finished.' };
 function renderActions() {
   const active = state?.phase === 'playing' && state.turn === 0 && !paused && !animating;
-  for (const id of ['new-match', 'rules-open', 'resources-open', 'sort']) $(id).disabled = animating;
+  for (const id of ['new-match', 'rules-open', 'sort']) $(id).disabled = animating;
   $('felt').setAttribute('aria-busy', String(animating));
   const error = active ? playError() : null;
   $('play').disabled = !active || selected.size === 0 || !!error;
@@ -336,7 +336,7 @@ $('continue').addEventListener('click', () => {
 });
 $('round-dialog').addEventListener('cancel', event => event.preventDefault());
 function openDialog(id) { if (animating) return; clearBot(); $(id).showModal(); }
-for (const [button, dialog] of [['rules-open', 'rules-dialog'], ['resources-open', 'resources-dialog']]) $(button).addEventListener('click', () => openDialog(dialog));
+$('rules-open').addEventListener('click', () => openDialog('rules-dialog'));
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
