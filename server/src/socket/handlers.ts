@@ -82,10 +82,6 @@ export function registerHandlers(io: IoServer, deps: HandlerDeps): void {
       const outcome = await runtime.enqueue({ type: 'continue', playerId, expectedRevision });
       return runtime.ack(outcome, () => revisionOf(outcome));
     });
-    bind('game:signal', async ({ size, enabled, expectedRevision }) => {
-      const outcome = await runtime.enqueue({ type: 'signal', playerId, size, enabled, expectedRevision });
-      return runtime.ack(outcome, () => revisionOf(outcome));
-    });
     bind('voice:token', async () => {
       if (!config.livekit) return { ok: false, code: 'VOICE_UNAVAILABLE', message: 'Voice is not configured on this server.' };
       const snapshot = runtime.current();

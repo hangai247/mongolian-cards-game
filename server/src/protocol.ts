@@ -2,7 +2,6 @@
 import { z } from 'zod';
 import type { Card, Event as EngineEvent, PlayerView, Suit, Team, ErrorCode as EngineErrorCode } from 'mongolian-eight-gar-engine';
 import { CODE_PATTERN, normalizeCode } from './codes.js';
-import type { Signals } from 'mongolian-eight-gar-engine/signals';
 
 export const DisplayName = z.string().trim().min(1).max(20).regex(/^[^\p{C}]+$/u, 'Use printable characters only');
 export const RoomCodeInput = z.string().min(1).max(16).transform(normalizeCode).pipe(z.string().regex(CODE_PATTERN, 'Room codes are six letters or digits'));
@@ -26,7 +25,6 @@ export const C2S = {
   'game:play': z.object({ cards: z.array(CardId).min(1).max(5), expectedRevision: Revision, actionId: ActionId }).strict(),
   'game:pickup': z.object({ expectedRevision: Revision, actionId: ActionId }).strict(),
   'game:continue': z.object({ expectedRevision: Revision }).strict(),
-  'game:signal': z.object({ size: z.union([z.literal(3), z.literal(5)]), enabled: z.boolean(), expectedRevision: Revision }).strict(),
   'voice:token': z.object({}).strict(),
 } as const;
 export type ClientEventName = keyof typeof C2S;
@@ -60,7 +58,6 @@ export type Cause = 'action' | 'timeout' | 'bot' | 'deal';
 
 export interface GameInfo {
   readonly view: PlayerView;
-  readonly signals: Signals;
   readonly deadline: number | null;
   readonly timer: TimerKind;
   readonly reviewUntil: number | null;
@@ -89,7 +86,6 @@ export type ClientEvent =
 export interface GameUpdatePayload {
   readonly version: number;
   readonly view: PlayerView;
-  readonly signals: Signals;
   readonly events: readonly ClientEvent[];
   readonly deadline: number | null;
   readonly timer: TimerKind;
@@ -102,14 +98,7 @@ export interface RoomClosedPayload { readonly reason: 'abandoned' | 'evicted' | 
 
 export interface VoiceTokenResult { readonly url: string; readonly token: string; readonly roomName: string; readonly identity: string }
 
-export interface SignalUpdatePayload {
-  readonly version: number;
-  readonly revision: number;
-  readonly signals: Signals;
-}
-
 export interface ServerToClient {
-  'game:signals': (payload: SignalUpdatePayload) => void;
   'room:state': (payload: RoomStatePayload) => void;
   'game:update': (payload: GameUpdatePayload) => void;
   'room:closed': (payload: RoomClosedPayload) => void;
@@ -120,7 +109,7 @@ export type ClientToServer = {
 };
 
 export type AckData<K extends ClientEventName> =
-  K extends 'game:play' | 'game:pickup' | 'game:confirmLeader' | 'game:continue' | 'game:signal' ? { readonly revision: number }
+  K extends 'game:play' | 'game:pickup' | 'game:confirmLeader' | 'game:continue' ? { readonly revision: number }
   : K extends 'voice:token' ? VoiceTokenResult
   : Empty;
 

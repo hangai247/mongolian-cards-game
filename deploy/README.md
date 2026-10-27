@@ -29,8 +29,9 @@ game ─> postgres:5432 (compose network, 127.0.0.1:5433 for ops)
 1. `deploy/aws.sh verify` — profile `aplus` must see instance `i-0395a6d6d18ecd1b4` and the `textbook.mn` zone. Stop if it does not.
 2. `deploy/aws.sh dns` — A records `8gar` and `livekit` → `52.76.113.170`; waits for INSYNC.
 3. `deploy/aws.sh sg` — opens TCP 7881, UDP 7882, UDP 3478. Never open 7880/4000/5433.
-4. On the host, create a read-only deploy key once:
-   `ssh-keygen -t ed25519 -N '' -f ~/.ssh/eight-gar-deploy` and add the `.pub` as a GitHub deploy key.
+4. Once, from the Mac, point a `prod` remote at the bare repo on the host and push:
+   `git remote add prod textbook-crawle:/home/ubuntu/eight-gar/repo.git && git push prod main`
+   (bootstrap creates the bare repo on its first run and asks for this push if it has no `main` yet).
 5. `ssh textbook-crawle 'bash -s' < deploy/bootstrap.sh` — generates `.env`, builds, starts, installs cron.
 6. `ssh -t textbook-crawle 'sudo bash -s' < deploy/caddy-install.sh` — certificates are issued on reload.
 7. `deploy/smoke.sh` — then the manual UDP, LiveKit and 8-tab checks it prints.

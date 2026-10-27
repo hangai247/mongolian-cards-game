@@ -27,6 +27,7 @@ COPY sites/eight-gar/package.json sites/eight-gar/
 RUN npm ci --omit=dev --workspaces --include-workspace-root && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server/dist ./server/dist
+COPY --from=builder /app/server/sql ./server/sql
 COPY --from=builder /app/sites/eight-gar/dist ./sites/eight-gar/dist
 # Reported by /healthz so a deploy can be matched to a commit.
 ARG GIT_SHA=dev
