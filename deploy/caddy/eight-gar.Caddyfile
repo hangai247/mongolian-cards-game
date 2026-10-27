@@ -1,0 +1,40 @@
+
+# ---- 8 гар card game (compose project /home/ubuntu/eight-gar), added 2026-10-27 ----
+8gar.textbook.mn {
+	encode zstd gzip
+	log {
+		output file /var/log/caddy/8gar.textbook.mn.log {
+			roll_size 50mb
+			roll_keep 10
+			roll_keep_for 336h
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "microphone=(self), camera=(), geolocation=()"
+		-Server
+	}
+	# socket.io: WebSocket upgrades pass through untouched in Caddy 2; long-polling fallback
+	# also works because there is a single game instance (no sticky sessions needed).
+	# No idle timeouts are configured: Caddy does not time out proxied websocket streams.
+	reverse_proxy 127.0.0.1:4000 {
+		header_up X-Real-IP {remote_host}
+		transport http {
+			dial_timeout 5s
+		}
+	}
+}
+
+livekit.textbook.mn {
+	log {
+		output file /var/log/caddy/livekit.textbook.mn.log {
+			roll_size 50mb
+			roll_keep 10
+		}
+	}
+	header -Server
+	reverse_proxy 127.0.0.1:7880
+}

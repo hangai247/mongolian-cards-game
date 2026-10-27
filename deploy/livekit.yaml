@@ -1,0 +1,27 @@
+# LiveKit v1.13.x single-node config for the eight-gar host.
+# No secrets here: API keys come from the LIVEKIT_KEYS environment variable (see docker-compose.yml).
+port: 7880                      # HTTP/WS signaling; reverse-proxied by Caddy at livekit.textbook.mn
+
+rtc:
+  udp_port: 7882                # single UDP mux port; port_range_* intentionally unset (one SG rule)
+  tcp_port: 7881                # ICE/TCP fallback for UDP-blocked networks
+  use_external_ip: true         # EC2 is behind 1:1 NAT; discover 52.76.113.170 via STUN
+  # node_ip: 52.76.113.170      # uncomment only if the logs show STUN discovery failing
+
+turn:
+  enabled: true
+  domain: livekit.textbook.mn
+  udp_port: 3478                # TURN/UDP (also answers STUN)
+  # tls_port: 5349              # phase 2 only; 443 is owned by Caddy, and 5349 needs cert_file/key_file
+
+room:
+  auto_create: true             # the game server mints a token per table; no pre-create call needed
+  empty_timeout: 300            # seconds an empty room survives (reconnect window)
+  departure_timeout: 20
+  max_participants: 0           # seat limits are enforced by the game server
+
+logging:
+  level: info
+  json: true
+
+# prometheus_port: 6789         # optional; would bind all interfaces, SG keeps it closed

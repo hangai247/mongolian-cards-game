@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDeck,createMatch,applyAction,RANKS} from '../dist/engine.js';
+import {createDeck,createMatch,applyAction,RANKS} from '../../../dist/engine.js';
 import {transitionSteps,fanLayout} from '../dist/presentation.js';
 function conserved(s){const cards=[...s.hands.flat(),...s.reserve,...s.table.pile,...s.sleeping];assert.equal(cards.length,43);assert.equal(new Set(cards.map(c=>c.id)).size,43);}
 function verify(before,action){const frozen=JSON.stringify(before);const result=applyAction(before,{...action,player:before.turn,expectedRevision:before.revision});const steps=transitionSteps(before,result.events);assert.equal(JSON.stringify(before),frozen);for(const step of steps){conserved(step.before);conserved(step.after);}for(const key of ['hands','reserve','table','sleeping'])assert.deepEqual(steps.at(-1).after[key],result.state[key]);return {steps,result};}

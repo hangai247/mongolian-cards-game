@@ -14,3 +14,9 @@ sites/eight-gar/.git-nested-backup/
 .DS_Store
 Thumbs.db
 *.log
+
+# Browser copies generated from the shared TypeScript rules
+/sites/eight-gar/dist/rules/
+
+# Server build output
+server/dist/

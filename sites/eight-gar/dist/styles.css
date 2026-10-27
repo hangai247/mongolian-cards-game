@@ -77,3 +77,40 @@
 @media(min-width:480px) and (max-width:700px){.table-center,.table-center:has(.discussion:not([hidden])){margin-top:710px}.welcome{top:710px}.felt{min-height:920px}.felt:has(.welcome:not([hidden])){min-height:1040px}.table-surface{top:400px}}
 
 @media(min-width:480px) and (max-width:700px){.character-room{height:820px}}
+
+/* ---- Online table: lobby, roster states, timers, voice ---- */
+.welcome.lobby{position:relative;top:auto!important;left:auto;transform:none;margin:290px auto 40px;width:min(520px,92%);text-align:left}
+.welcome.lobby h2{font-size:30px;text-align:center}.welcome.lobby .welcome-suits,.welcome.lobby>div>.eyebrow{display:block;text-align:center}
+.lobby-label{display:block;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:#c5ad7b;margin:14px 0 7px}
+.lobby-input{width:100%;border:1px solid #9c855e;border-radius:6px;padding:12px 13px;background:#1b2a22;color:#f7ead0;font-size:14px}
+.lobby-input.code{text-transform:uppercase;letter-spacing:4px;font-family:Georgia,serif;font-size:18px}
+.lobby-row,.share-row{display:flex;gap:8px;align-items:stretch}.lobby-row .quiet-button,.share-row .quiet-button{flex-shrink:0;min-width:84px}
+.lobby-actions{display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap}.lobby-actions .button{flex:1 1 220px}
+.lobby-join{margin-top:6px}.lobby-error{display:block;min-height:16px;margin-top:12px;color:#f0a98c;font-size:11px;text-align:center}
+#lobby-room .eyebrow b{color:#f6e5bd;letter-spacing:3px;font:14px Georgia,serif;margin-left:6px}
+.share-row{margin:0 0 14px}.share-row .lobby-input{font-size:11px;color:#cdbb9c}
+.seat-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seat-row{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #c7a76a44;border-radius:8px;background:#ffffff08;font-size:12px;min-height:44px}
+.seat-row.theirs{border-color:#dfb56c44}.seat-row.ours{border-color:#9dc9b544}
+.seat-row.clickable{cursor:pointer}.seat-row.clickable:hover{background:#ffffff14;border-color:#e6c789}
+.seat-row.me{background:#285f4e33;border-color:#85bda3}
+.seat-no{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:10px;flex-shrink:0;background:#9dc9b5;color:#12241c}.theirs .seat-no{background:#dfb56c;color:#2b2013}
+.seat-who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f1e4ca}.seat-row.empty .seat-who,.seat-row.bot .seat-who{color:#a8a08a;font-style:italic}
+.seat-tags{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#bfb49d;white-space:nowrap}.seat-tags .online{color:#95cab0}.seat-tags .offline{color:#e3a07a}
+.seat-row .text-button{padding:4px 2px;font-size:10px;white-space:nowrap}
+#lobby-status{display:block;text-align:center;margin-top:12px;font-size:10px;color:#b9d5c4}#lobby-leave{display:block;margin:10px auto 0}
+.room-badge{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#bfb49d}.room-badge b{font:15px Georgia,serif;letter-spacing:3px;color:#f6e5bd}.room-badge .text-button{font-size:9px;padding:6px 0}
+.conn-status{font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#f0a98c;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.4}}
+.voice-button.on{border-color:#85bda3;background:#285f4e}.voice-button.muted{border-color:#e3a07a}
+.turn-timer{display:inline-block;margin:0 0 9px 8px;font-size:11px;letter-spacing:1px;color:#ffe7b3;background:#17251dd9;border:1px solid #c2a16455;border-radius:30px;padding:7px 13px;vertical-align:top;min-width:64px;font-variant-numeric:tabular-nums}
+.turn-timer.urgent{color:#ffd0b0;border-color:#e3a07a;animation:pulse .8s infinite}
+.seat.offline{opacity:.72}.seat.offline .player-status{color:#e3a07a}.seat.bot .seat-name:after{content:' ⚙';font-size:9px;color:#bfb49d}
+.seat.speaking{border-color:#95cab0;box-shadow:0 0 0 2px #85bda355,0 0 22px #95cab066}.seat.speaking .avatar{box-shadow:0 0 0 3px #95cab0}
+.seat-row.speaking{box-shadow:inset 0 0 0 1px #95cab0}
+.review-note{font-size:11px;color:#b9d5c4;margin:-8px 0 16px;min-height:17px;font-variant-numeric:tabular-nums}
+.waiting-copy{font-size:12px;color:#c9cbb4;margin:0}
+.team-score small{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:700px){.seat-list{grid-template-columns:1fr}.welcome.lobby{margin-top:250px}.room-badge .text-button{display:none}.team-score small{max-width:110px}}
+
+
+/* Private declarations are separate from the public move caption. */

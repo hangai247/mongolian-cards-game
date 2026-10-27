@@ -1,0 +1,32 @@
+{
+  "name": "eight-gar-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Authoritative realtime host for Mongolian 8 гар: express + socket.io + LiveKit tokens + Postgres",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "start": "node dist/main.js",
+    "copy-vendor": "cp \"$(ls ../node_modules/livekit-client/dist/livekit-client.esm.mjs node_modules/livekit-client/dist/livekit-client.esm.mjs 2>/dev/null | head -1)\" ../sites/eight-gar/dist/vendor/livekit-client.esm.mjs"
+  },
+  "dependencies": {
+    "mongolian-eight-gar-engine": "file:..",
+    "express": "5.3.0",
+    "livekit-server-sdk": "2.19.2",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "socket.io": "4.8.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
+    "livekit-client": "2.23.0",
+    "socket.io-client": "4.8.4",
+    "typescript": "5.9.3"
+  }
+}

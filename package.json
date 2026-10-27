@@ -2,16 +2,40 @@
   "name": "mongolian-eight-gar-engine",
   "version": "1.0.0",
   "private": true,
-  "description": "Headless Mongolian 8 гар rules engine with atomic automatic reserve refill",
+  "description": "Headless Mongolian 8 \u0433\u0430\u0440 rules engine with atomic automatic reserve refill",
   "type": "module",
-  "engines": { "node": ">=22" },
-  "exports": { ".": { "types": "./dist/engine.d.ts", "import": "./dist/engine.js" } },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./strategy": {
+      "types": "./dist/strategy.d.ts",
+      "import": "./dist/strategy.js"
+    },
+    "./signals": {
+      "types": "./dist/signals.d.ts",
+      "import": "./dist/signals.js"
+    }
+  },
+  "workspaces": [
+    "server",
+    "sites/eight-gar"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-browser-modules.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",
     "demo": "npm run build && node examples/demo.mjs",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "build:all": "npm run build && npm run build -w server",
+    "test:all": "npm test && npm test -w sites/eight-gar && npm test -w server",
+    "start": "node server/dist/main.js"
   },
-  "devDependencies": { "typescript": "5.9.3" }
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
 }

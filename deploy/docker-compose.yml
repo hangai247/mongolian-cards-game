@@ -1,0 +1,120 @@
+# 8 гар production stack on textbook-crawle. Copied by deploy.sh to /home/ubuntu/eight-gar/docker-compose.yml.
+# Isolated compose project: `docker compose down` here can never touch the "studio" project.
+name: eight-gar
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  game:
+    image: eight-gar-game:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0              # inside the container; the host publishes loopback only
+      PORT: "4000"
+      TRUST_PROXY: "1"           # Caddy sets X-Forwarded-For / X-Forwarded-Proto
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://eightgar:${POSTGRES_PASSWORD}@postgres:5432/eightgar
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://8gar.textbook.mn}
+      LIVEKIT_URL: ${LIVEKIT_URL:-wss://livekit.textbook.mn}   # handed to browsers
+      GIT_SHA: ${GIT_SHA:-dev}
+    ports:
+      - "127.0.0.1:4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach LiveKit's API on the host network if ever needed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # node:slim ships no curl/wget; fetch() is built in.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    oom_score_adj: 500          # if the host ever runs out of memory, kill us before textbook.mn
+    logging: *default-logging
+
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    network_mode: host           # binds 7880/7881/7882/3478 directly; the AWS security group is the firewall
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      # Keys are injected via env so livekit.yaml holds no secrets.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit/config.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      # Alpine image: busybox wget. If this ever fails with "wget: not found", drop the healthcheck.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7880/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1536M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    oom_score_adj: 400
+    logging: *default-logging
+
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eightgar
+      POSTGRES_USER: eightgar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=60
+      - -c
+      - log_min_duration_statement=500
+    ports:
+      - "127.0.0.1:5433:5432"    # ops/psql only (studio's postgres is on 5434); the app uses the compose network
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eightgar -d eightgar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+    oom_score_adj: 300
+    logging: *default-logging
+
+volumes:
+  pgdata:
