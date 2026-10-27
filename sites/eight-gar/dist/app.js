@@ -1,3 +1,4 @@
+import { keepLatestPlayVisible } from './viewport-table.js';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
 import { RANKS, SUITS, JOKERS, applyAction, canLeadThree, canLeadFive } from './engine.js';
@@ -153,6 +154,7 @@ function render(sceneArg = scene, motion = null) {
   $('team-us-names').textContent = [0, 2, 4, 6].map(d => names[d]).join(' · ');
   $('team-them-names').textContent = [1, 3, 5, 7].map(d => names[d]).join(' · ');
   $('seats').replaceChildren();
+  $('self-seat').replaceChildren();
   for (let index = 0; index < 8; index++) {
     const info = seatInfo(index);
     const count = sceneArg?.hands[index].length ?? 0;
@@ -178,9 +180,10 @@ function render(sceneArg = scene, motion = null) {
       }
       seat.append(fan);
     }
-    $('seats').append(seat);
+    $(index === 0 ? 'self-seat' : 'seats').append(seat);
   }
   characterRoom.update({ handCounts: sceneArg?.hands.map(hand => hand.length) ?? Array(8).fill(0), phase: sceneArg?.phase, turn: sceneArg?.turn, winner: sceneArg?.winner, paused: false }, motion);
+  const pileScroll = $('highest').scrollLeft;
   $('highest').replaceChildren();
   $('pile-key').hidden = !sceneArg?.table.pile.length;
   if (sceneArg?.table.pile.length) {
@@ -197,6 +200,7 @@ function render(sceneArg = scene, motion = null) {
     }
   }
   else if (sceneArg && sceneArg.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'A fresh lead.'; $('highest').append(empty); }
+  keepLatestPlayVisible($('highest'), sceneArg?.table.pile, pileScroll);
   $('turn-label').textContent = !sceneArg ? 'YOUR SEAT IS READY' : sceneArg.phase === 'choosing-leader' ? 'DEALT · TEAM DISCUSSION' : sceneArg.phase !== 'playing' ? 'ROUND COMPLETE' : sceneArg.turn === 0 ? 'YOUR TURN' : `${names[sceneArg.turn].toUpperCase()}’S TURN`;
   if (motion) $('turn-label').textContent = ({ pickup: 'COLLECTING CARDS', play: 'PLAYING CARDS', refill: 'DRAWING RESERVE', sleep: 'УНТАНА' })[motion.type];
   $('reserve-count').textContent = sceneArg?.reserve.length ?? 3;
@@ -205,6 +209,7 @@ function render(sceneArg = scene, motion = null) {
   $('table-message').hidden = connected || !session;
   $('table-message').textContent = 'Connection lost. Reconnecting…';
   $('live-move').textContent = liveMove;
+  $('live-move').title = liveMove;
   $('live-move').hidden = !liveMove;
   renderHand(sceneArg);
   if (motion?.player === 0 && motion.beforeCounts && ['pickup','refill'].includes(motion.type)) $('hand-count').textContent = `${motion.beforeCounts[0]} cards`;

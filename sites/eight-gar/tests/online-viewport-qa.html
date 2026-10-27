@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Online viewport checks</title>
+<style>[hidden]{display:none!important}body{margin:0;background:#eee;color:#222;font:14px system-ui}header{padding:10px;display:flex;gap:10px}iframe{display:block;border:0;margin:auto}pre{max-height:140px;overflow:auto;white-space:pre-wrap}</style>
+<header><button id="run">Run online layout checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header><pre id="output"></pre><iframe id="game" title="Online table" width="390" height="844" src="/"></iframe>
+<script type="module">
+const frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const assert=(value,message)=>{if(!value)throw Error(message);output.textContent+='✓ '+message+'\n';};
+const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;await new Promise(r=>setTimeout(r,25));}throw Error('Timed out');};
+function check(width,height,label){
+ const doc=frame.contentDocument;
+ assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,label+': page fits');
+ for(const id of ['resources-open','rules-open','new-match','copy-link','voice-join','welcome','hand','play','pickup','hint']){
+  const node=doc.getElementById(id);if(!node||!node.getClientRects().length)continue;const box=node.getBoundingClientRect();
+  assert(box.width>0&&box.height>0&&box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height+1,label+': '+id+' visible');
+ }
+}
+document.querySelector('#run').onclick=async()=>{
+ output.textContent='';status.textContent='Running…';
+ try{
+  let doc=frame.contentDocument;
+  await waitFor(()=>doc.querySelector('#create')&&!doc.querySelector('#create').disabled);
+  for(const [width,height] of [[320,568],[568,320],[390,844],[700,900],[844,390],[1440,900]]){frame.width=width;frame.height=height;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));check(width,height,`${width}×${height} lobby`);}
+  frame.width=320;frame.height=568;
+  const name=doc.querySelector('#lobby-name');name.value='Alexanderthegreat';name.dispatchEvent(new Event('input',{bubbles:true}));doc.querySelector('#create').click();
+  await waitFor(()=>!doc.querySelector('#lobby-room').hidden);
+  check(320,568,'320×568 room');
+  doc.querySelector('#voice-join').hidden=false;doc.querySelector('#conn-status').hidden=false;check(320,568,'320×568 voice and reconnect controls');
+  doc.querySelector('#fill-bots').click();await waitFor(()=>!doc.querySelector('#start-game').disabled);doc.querySelector('#start-game').click();
+  await waitFor(()=>doc.body.classList.contains('has-match'));
+  for(const [width,height] of [[320,568],[568,320],[390,844],[700,900],[844,390],[1440,900]]){frame.width=width;frame.height=height;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));check(width,height,`${width}×${height} game`);}
+  frame.width=390;frame.height=844;status.textContent='All online viewport checks passed';
+ }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}
+};
+document.querySelector('#clean').onclick=()=>{document.querySelector('header').hidden=true;output.hidden=true;window.scrollTo(0,0);};
+</script>

@@ -1,0 +1,222 @@
+/* One shared, viewport-sized layout for the practice and online tables.
+   The outer page never scrolls; hands, piles and dialogs own their overflow. */
+html:has(.viewport-table){height:100%;overflow:hidden}
+.viewport-table{height:100vh;height:100dvh;overflow:hidden;display:grid;grid-template-rows:48px minmax(0,1fr);--dock-height:clamp(252px,37dvh,334px);--portrait-height:clamp(100px,28dvh,280px)}
+.viewport-table *{box-sizing:border-box}
+.viewport-table .header{height:auto;min-width:0;padding:0 18px;gap:12px}
+.viewport-table .brand{font-size:23px;gap:8px}
+.viewport-table .brand-mark{height:32px;width:29px;font-size:25px;border-radius:10px 10px 4px 4px}
+.viewport-table .brand small{font-size:6px;letter-spacing:1.7px}
+.viewport-table .header-right{gap:10px;min-width:0}
+.viewport-table .header button{min-height:36px;margin:0}
+.viewport-table #resources-open{font-size:18px;padding:4px 8px}
+.viewport-table main,.viewport-table .game-layout{width:100%;height:100%;min-height:0;min-width:0;max-width:none;overflow:hidden}
+.viewport-table footer{display:none}
+.viewport-table .play-area{height:100%;min-height:0;min-width:0;display:grid;grid-template-rows:46px minmax(0,1fr) var(--dock-height);overflow:hidden}
+.viewport-table:not(.has-match) .play-area{grid-template-rows:46px minmax(0,1fr)}
+.viewport-table:not(.has-match) .hand-zone{display:none}
+.viewport-table .scoreboard{position:relative;inset:auto;height:auto;min-width:0;gap:12px;padding:4px 18px;background:#211d17;border-bottom:1px solid #ad8d5340;pointer-events:auto}
+.viewport-table .team-score{background:none;box-shadow:none;backdrop-filter:none;border:0;border-radius:0;padding:0;min-width:0;gap:9px}
+.viewport-table .team-score b{font-size:25px;margin:0}
+.viewport-table .team-score strong{font-size:11px}
+.viewport-table .team-score small{display:none}
+.viewport-table .round-meta{display:flex;align-items:center;gap:10px;box-shadow:none;background:none;backdrop-filter:none;border:0;padding:0;white-space:nowrap}
+.viewport-table .round-meta span{margin:0;font-size:9px;letter-spacing:1px}
+.viewport-table .round-meta strong{font-size:12px}
+.viewport-table .felt,.viewport-table .felt:has(.welcome:not([hidden])){min-height:0;min-width:0;overflow:hidden;display:grid;grid-template-rows:minmax(0,var(--portrait-height)) minmax(0,1fr);background-size:cover;background-position:center 30%;padding:0}
+.viewport-table .felt:before{background:linear-gradient(#100e0b0a,#12372955 38%,#0e3029dd 70%)}
+.viewport-table .felt:after{box-shadow:inset 0 0 70px #0003}
+.viewport-table .table-surface{inset:var(--portrait-height) -4% 0;top:calc(var(--portrait-height) - 14px);width:108%;height:auto;border-width:5px;border-radius:45% 45% 0 0;box-shadow:0 -2px #c69d5555,0 -7px #4a2d1e88,inset 0 10px 30px #061c1688}
+.viewport-table .table-surface:after{inset:8px;border-radius:45% 45% 0 0}
+.viewport-table .portrait-band{position:relative;min-height:0;min-width:0;overflow:hidden;z-index:1}
+.viewport-table .character-room{inset:0;height:100%;width:100%;display:block}
+.viewport-table .character-fallback{height:100%;overflow:hidden}
+.viewport-table .seats{inset:0;z-index:3}
+.viewport-table .table-outline,.viewport-table .table-watermark{display:none}
+.viewport-table .seat:not(.seat-0){min-width:0;width:max-content;max-width:calc(100% / 7 - 4px);padding:4px 6px;gap:4px;border-radius:5px;flex-wrap:wrap;justify-content:center}
+.viewport-table .seat:not(.seat-0)>div:not(.avatar):not(.opponent-hand){display:flex;gap:5px;align-items:center;min-width:0;max-width:100%}
+.viewport-table .seat .seat-name{font-size:11px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;margin:0}
+.viewport-table .seat .seat-meta{font-size:10px}
+.viewport-table .seat .avatar{display:none}
+.viewport-table .seat .team-mark{width:9px;height:11px;flex-basis:9px}
+.viewport-table .seat .team-mark.ring{height:9px}
+.viewport-table .seat .player-status,.viewport-table .seat .turn-marker{position:static;flex-basis:100%;width:auto;max-width:100%;font-size:9px;line-height:1.1;letter-spacing:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewport-table .seat:has(.turn-marker) .player-status{display:none}
+.viewport-table .opponent-hand{width:150px;height:82px}
+.viewport-table .table-center,.viewport-table .table-center:has(.discussion:not([hidden])){position:relative;display:grid;grid-template-rows:auto minmax(0,1fr) 26px;align-items:stretch;width:min(100%,1100px);height:100%;min-height:0;min-width:0;margin:0 auto;padding:5px 12px 3px;z-index:2}
+.viewport-table .table-heading{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:4px 12px;min-width:0;max-height:66px;overflow:auto;scrollbar-width:thin}
+.viewport-table .turn-label{font-size:10px;letter-spacing:1.3px;padding:5px 12px;margin:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewport-table .turn-timer{font-size:10px;padding:5px 8px;margin:0}
+.viewport-table .sleep-meter{max-width:none;margin:0;display:flex;gap:5px;align-items:center}
+.viewport-table #sleep-progress{display:flex;align-items:center;gap:8px}
+.viewport-table #sleep-label{font-size:10px;letter-spacing:0;white-space:nowrap}
+.viewport-table #sleep-markers{margin:0;gap:4px}
+.viewport-table #sleep-markers i{width:12px;height:5px}
+/* Longer explanations remain accessible and appear as hover hints on the meter. */
+.viewport-table #sleep-note,.viewport-table #turn-order-note{position:absolute!important;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap;padding:0;margin:0}
+.viewport-table .live-move{flex-basis:100%;font-size:11px;line-height:16px;min-height:0;max-width:100%;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewport-table .pile-key{display:none}
+.viewport-table .highest{container-type:size;min-width:0;min-height:0;height:100%;padding:4px 2px;display:flex;flex-wrap:nowrap;justify-content:safe center;align-items:center;gap:10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#b89b60 #102d24;perspective:none;overscroll-behavior:contain}
+.viewport-table .table-play{flex:0 0 auto;transform:none;gap:4px;padding:3px;max-width:none;height:calc(min(100cqh,118px) - 10px);min-height:0;border-radius:6px}
+.viewport-table .highest .card{height:100%;width:calc((min(100cqh,118px) - 18px) * .68);min-width:0;flex:0 0 auto;padding:3px;container-type:size;box-shadow:1px 2px 4px #0005}
+.viewport-table .table-play:not(.latest-play){opacity:.82}
+.viewport-table .highest .card-corner{font-size:clamp(9px,18cqh,19px);line-height:1;width:auto;left:3px;top:3px}
+.viewport-table .highest .card-corner small{font-size:clamp(7px,12cqh,13px);line-height:1}
+.viewport-table .highest .card-bottom{left:auto;top:auto;right:3px;bottom:3px}
+.viewport-table .highest .card-center{font-size:clamp(12px,37cqh,38px)}
+.viewport-table .highest .pips{inset:22% 25%;gap:0}
+.viewport-table .highest .pips i{font-size:clamp(6px,14cqh,15px)}
+.viewport-table .highest .face-emblem{inset:22% 25%;font-size:clamp(14px,40cqh,44px)}
+.viewport-table .highest .face-suit{font-size:10px;bottom:17%}
+.viewport-table .highest .card.joker .card-corner{font-size:6px;height:auto}
+.viewport-table .highest .joker-label{font-size:6px;bottom:15%}
+.viewport-table .empty-table{font-size:18px}
+.viewport-table .table-stats{margin:0;gap:20px;min-height:0;font-size:10px;align-items:center}
+.viewport-table .table-stats b{font-size:11px}
+.viewport-table .table-stats button{font-size:10px;padding:3px}
+.viewport-table .tiny-deck{width:12px;height:18px;border-width:1px}
+.viewport-table .table-message{position:absolute;inset:auto 8px 3px auto;transform:none;white-space:normal;font-size:9px;max-width:40%;padding:4px 6px;pointer-events:none}
+.viewport-table .hand-zone{height:100%;min-height:0;min-width:0;overflow:hidden;padding:5px 16px max(5px,env(safe-area-inset-bottom));display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'summary summary' 'top signals' 'defense defense' 'hand hand' 'actions actions';grid-template-rows:auto 32px auto minmax(0,1fr) 52px;column-gap:10px;row-gap:3px}
+.viewport-table .hand-top{grid-area:top;gap:10px;justify-content:flex-start;min-width:0}
+.viewport-table .hand-top>div{white-space:nowrap}
+.viewport-table .hand-top .eyebrow{font-size:8px;margin-right:7px}
+.viewport-table #hand-count{font-size:10px}
+.viewport-table .hand-top #sort{margin-left:auto;font-size:11px;padding:4px;min-height:30px;white-space:nowrap}
+.viewport-table #self-seat{flex:0 0 auto}
+.viewport-table #self-seat .seat{position:static;transform:none;inset:auto;min-width:0;max-width:140px;padding:3px 6px;gap:3px;background:none;box-shadow:none;display:flex;align-items:center;border:0}
+.viewport-table #self-seat .seat:after{display:none}
+.viewport-table #self-seat .team-mark{display:none}
+.viewport-table #self-seat .seat>div{display:none}
+.viewport-table #self-seat .player-status,.viewport-table #self-seat .turn-marker{font-size:10px;color:#ffe1a5}
+.viewport-table .team-summary{grid-area:summary;min-height:0;margin:0;padding:0 0 4px;border-bottom:1px solid #b99a6033;display:flex;align-items:center;justify-content:center;gap:7px 14px;flex-wrap:nowrap;font-size:11px;overflow:hidden}
+.viewport-table .team-summary strong{font-size:10px;white-space:nowrap}
+.viewport-table .team-member{min-width:0;gap:4px;white-space:nowrap;font-size:11px}
+.viewport-table .team-member small{font-size:8px;padding:0 3px}
+.viewport-table .summary-unit{display:none}
+.viewport-table .team-signals{grid-area:signals;margin:0;padding:0;display:flex;align-items:center;gap:4px;border:0;min-width:0}
+.viewport-table .signal-buttons{display:flex;gap:5px}
+.viewport-table .signal-buttons button{min-width:0;min-height:32px;font-size:10px;padding:4px 9px;white-space:nowrap}
+.viewport-table .signal-label,.viewport-table .signal-status{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+.viewport-table .defense-preview{grid-area:defense;display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;min-height:0;max-height:70px;overflow:auto;margin:0;padding:5px 8px;border-radius:6px;scrollbar-width:thin}
+.viewport-table .defense-heading{display:contents;margin:0}
+.viewport-table .defense-heading h3{font-size:13px;align-self:center;margin:0;grid-column:1;grid-row:1}
+.viewport-table #defense-status{font-size:11px;line-height:14px;grid-column:2;grid-row:1;align-self:center;margin:0}
+.viewport-table #defense-pairs{grid-column:1/-1;display:flex;flex-wrap:nowrap;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.viewport-table .defense-pair{flex:0 0 auto;gap:5px;padding:3px 6px;min-height:0;border-radius:4px}
+.viewport-table .defense-card{min-width:0;font-size:13px;padding:1px 4px}
+.viewport-table .defense-result{font-size:10px;white-space:nowrap}
+.viewport-table #defense-unused{grid-column:1/-1;font-size:10px;margin:0;line-height:13px}
+.viewport-table .hand{grid-area:hand;container-type:size;min-height:0;min-width:0;height:100%;padding:10px 8px 5px;display:flex;justify-content:safe center;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;perspective:none;overscroll-behavior:contain}
+.viewport-table .hand .card{container-type:size;flex:0 0 auto;height:min(100cqh,136px);width:calc(min(100cqh,136px) * .684);min-width:0;margin:0;transform:none;border-radius:5px;padding:4px}
+.viewport-table .hand .card:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 4px 10px #0008}
+.viewport-table .hand .card.selected{transform:translateY(-5px);border-width:2px}
+.viewport-table .hand .card.selected:after{width:16px;height:16px;right:0;top:-5px;font-size:10px}
+.viewport-table .hand .card-corner{font-size:clamp(12px,19cqh,24px);line-height:1;left:4px;top:4px;width:auto}
+.viewport-table .hand .card-corner small{font-size:clamp(8px,13cqh,16px);line-height:1}
+.viewport-table .hand .card-bottom{left:auto;top:auto;right:4px;bottom:4px}
+.viewport-table .hand .pips{inset:23% 25%;gap:0}
+.viewport-table .hand .pips i{font-size:clamp(7px,14cqh,18px)}
+.viewport-table .hand .card-center{font-size:clamp(20px,36cqh,42px)}
+.viewport-table .hand .face-emblem{inset:23% 25%;font-size:clamp(22px,38cqh,46px)}
+.viewport-table .hand .face-suit{font-size:12px;bottom:16%}
+.viewport-table .hand .card.joker .card-corner{font-size:7px;height:auto}
+.viewport-table .hand .joker-label{font-size:6px;bottom:16%}
+.viewport-table .pips-7 i:last-child,.viewport-table .pips-9 i:last-child{left:50%;transform:translate(-50%,-50%)}
+.viewport-table .pips-7 i:last-child{top:33.333%}
+.viewport-table .pips-9 i:last-child{top:50%}
+.viewport-table .action-row{grid-area:actions;position:static;min-height:0;padding:5px 0 0;gap:12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #be9b5a33}
+.viewport-table .action-row p{font-size:11px;line-height:15px;max-height:42px;overflow:auto;max-width:50%;text-align:left;min-height:0;scrollbar-width:thin}
+.viewport-table .play-buttons{gap:8px}
+.viewport-table .play-buttons button{min-height:40px;padding:8px 16px;font-size:12px;min-width:0}
+.viewport-table .play-buttons #play{min-width:130px}
+.viewport-table .welcome,.viewport-table .welcome.lobby{position:absolute;top:50%!important;left:50%;transform:translate(-50%,-50%);width:min(520px,90%);max-height:calc(100% - 12px);margin:0;padding:20px;overflow:auto;scrollbar-width:thin;z-index:4}
+.viewport-table .welcome h2{font-size:30px}.viewport-table .welcome p{font-size:12px;line-height:1.6}
+.viewport-table .welcome-suits{margin:0 0 5px}
+.viewport-table .discussion{max-width:560px;width:100%;max-height:100%;min-height:0;overflow:auto;padding:10px 14px;margin:0 auto;scrollbar-width:thin}
+.viewport-table .discussion h2{font-size:21px;margin:0 0 4px}.viewport-table .discussion p{font-size:11px;line-height:1.4;margin:0 0 6px}
+.viewport-table .discussion label{font-size:10px;margin-bottom:3px}
+.viewport-table .discussion select{padding:7px;font-size:12px}
+.viewport-table .discussion .button{margin-top:5px;padding:8px;min-height:34px;font-size:11px}
+.viewport-table .discussion small{font-size:9px;line-height:1.3;margin-top:5px}
+.viewport-table .table-center:has(.discussion:not([hidden])){grid-template-rows:auto minmax(0,1fr) 24px}
+.viewport-table .table-center:has(.discussion:not([hidden])) .highest{display:none}
+.viewport-table dialog{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+.viewport-table #toast{bottom:12px;font-size:11px;padding:10px 16px}
+@media(max-width:700px){
+ .viewport-table{grid-template-rows:44px minmax(0,1fr);--dock-height:clamp(268px,38dvh,316px);--portrait-height:clamp(88px,17dvh,146px)}
+ .viewport-table .header{padding:0 9px;gap:6px}.viewport-table .brand{font-size:19px}.viewport-table .brand small,.viewport-table .room-heading{display:none}
+ .viewport-table .brand-mark{width:25px;height:28px;font-size:23px}
+ .viewport-table .header-right{gap:5px}.viewport-table .header button{font-size:10px;min-height:34px;padding:5px 7px}
+ .viewport-table .header:has(.room-badge:not([hidden])) .brand>span:last-child{display:none}
+ .viewport-table .header .brand,.viewport-table .header button{flex-shrink:0;white-space:nowrap}
+ .viewport-table #resources-open{font-size:16px;padding:4px}
+ .viewport-table .header #pause{min-width:0}.viewport-table .header #new-match{font-size:15px}
+ .viewport-table .room-badge{font-size:0;gap:0;letter-spacing:0}.viewport-table .room-badge b{font-size:11px;letter-spacing:1px}
+ .viewport-table .conn-status{font-size:8px;letter-spacing:0;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .viewport-table .play-area{grid-template-rows:38px minmax(0,1fr) var(--dock-height)}
+ .viewport-table:not(.has-match) .play-area{grid-template-rows:38px minmax(0,1fr)}
+ .viewport-table .scoreboard{padding:3px 9px;gap:5px}.viewport-table .team-score{gap:5px}.viewport-table .team-score strong{font-size:10px}.viewport-table .team-score b{font-size:20px}
+ .viewport-table .round-meta{display:block}.viewport-table .round-meta span{font-size:7px;margin-bottom:2px}.viewport-table .round-meta strong{font-size:10px}
+ .viewport-table .team-mark{width:10px;height:12px;flex-basis:10px}.viewport-table .team-mark.ring{height:10px;border-width:2px}
+ .viewport-table .seat:not(.seat-0){max-width:calc(100% / 7 - 2px);padding:3px 2px;gap:2px}
+ .viewport-table .seat:not(.seat-0)>div:not(.avatar):not(.opponent-hand){flex-direction:column;gap:1px}
+ .viewport-table .seat .seat-name{font-size:9px}.viewport-table .seat .seat-meta{font-size:8px}
+ .viewport-table .seat .seat-meta .seat-back{display:none}
+ .viewport-table .seat .team-mark{position:absolute;top:2px;left:2px;width:6px;height:8px;display:block}
+ .viewport-table .seat .team-mark.ring{height:6px;border-width:1px}
+ .viewport-table .seat .player-status,.viewport-table .seat .turn-marker{font-size:7px}
+ .viewport-table .table-center,.viewport-table .table-center:has(.discussion:not([hidden])){padding:3px 6px 2px;grid-template-rows:auto minmax(0,1fr) 22px}
+ .viewport-table .table-heading{gap:3px 6px;max-height:52px}.viewport-table .turn-label{font-size:8px;letter-spacing:.6px;padding:3px 7px}
+ .viewport-table #sleep-label{font-size:9px}.viewport-table #sleep-progress{gap:5px}.viewport-table #sleep-markers{gap:3px}.viewport-table #sleep-markers i{width:8px;height:4px}
+ .viewport-table .live-move{font-size:10px;line-height:14px}
+ .viewport-table .highest{gap:7px}.viewport-table .table-play{height:calc(min(100cqh,91px) - 8px);gap:3px;padding:2px}
+ .viewport-table .highest .card{width:calc((min(100cqh,91px) - 14px) * .68)}
+ .viewport-table .table-message{font-size:8px;max-width:45%;padding:2px 4px}
+ .viewport-table .hand-zone{padding:4px 8px max(4px,env(safe-area-inset-bottom));grid-template-rows:auto 30px auto minmax(0,1fr) 76px;gap:2px 6px}
+ .viewport-table .team-summary{justify-content:space-between;gap:4px;padding-bottom:3px;font-size:9px;min-height:24px}
+ .viewport-table .team-summary strong{font-size:9px;flex-basis:auto}.viewport-table .team-summary>.team-mark{display:none}
+ .viewport-table .team-member{font-size:9px;line-height:1.3;display:flex;flex-wrap:wrap;gap:1px;justify-content:center;text-align:center;max-width:23%}
+ .viewport-table .team-member+.team-member:before{display:none}.viewport-table .team-member small{font-size:7px;padding:0 2px}
+ .viewport-table .hand-top{gap:4px}.viewport-table .hand-top .eyebrow{display:none}.viewport-table #hand-count{font-size:9px}
+ .viewport-table .hand-top #sort{font-size:9px;padding:3px;min-height:28px}
+ .viewport-table #self-seat .seat{padding:0;max-width:60px}.viewport-table #self-seat .turn-marker,.viewport-table #self-seat .player-status{font-size:8px}
+ .viewport-table .signal-buttons{gap:4px}.viewport-table .signal-buttons button{font-size:9px;min-height:28px;padding:4px 6px}
+ .viewport-table .defense-preview{gap:2px 7px;padding:4px 5px;max-height:66px}
+ .viewport-table .defense-heading h3{font-size:11px}.viewport-table #defense-status{font-size:10px;line-height:12px}
+ .viewport-table .defense-result{font-size:9px}.viewport-table .defense-card{font-size:12px}.viewport-table .defense-pair{padding:2px 4px;gap:4px}
+ .viewport-table .hand{padding:8px 3px 3px;gap:4px}
+ .viewport-table .action-row{flex-direction:column;align-items:stretch;gap:3px;padding-top:3px}
+ .viewport-table .action-row p{font-size:10px;line-height:13px;max-height:26px;max-width:none;text-align:center;flex:0 1 auto}
+ .viewport-table .play-buttons{gap:6px;flex:1;min-height:0}.viewport-table .play-buttons button{min-height:48px;flex:1;padding:7px 8px;font-size:11px}
+ .viewport-table .play-buttons #play{min-width:0;flex:1.4}
+ .viewport-table .welcome,.viewport-table .welcome.lobby{padding:16px;width:94%}.viewport-table .welcome h2{font-size:26px}
+ .viewport-table .seat-list{grid-template-columns:1fr 1fr}.viewport-table .seat-row{min-width:0;padding:7px;gap:5px;font-size:10px}
+}
+@media(max-width:700px) and (max-height:700px){
+ .viewport-table .welcome.lobby{padding:10px}
+ .viewport-table .welcome.lobby h2{font-size:22px;margin:5px 0 8px}
+ .viewport-table .welcome.lobby p{font-size:11px;line-height:1.4;margin:0 0 10px}
+ .viewport-table .lobby-label{margin:8px 0 4px}
+ .viewport-table .lobby-input{padding:8px 10px;font-size:12px}
+ .viewport-table .share-row{margin-bottom:8px}
+ .viewport-table .seat-list{gap:4px}
+ .viewport-table .seat-row{min-height:38px;padding:4px;gap:4px}
+ .viewport-table .lobby-actions{margin-top:8px;gap:6px;flex-wrap:nowrap}
+ .viewport-table .lobby-actions button{flex:1;min-width:0;padding:8px 6px;min-height:36px;font-size:10px}
+ .viewport-table #lobby-status{margin-top:4px}
+ .viewport-table #lobby-leave{margin-top:4px;padding:4px}
+}
+/* Short, wide screens use two working areas rather than squeezing the hand below the table. */
+@media(min-width:480px) and (max-height:500px){
+ .viewport-table{grid-template-rows:40px minmax(0,1fr);--portrait-height:clamp(74px,24dvh,110px)}
+ .viewport-table .play-area{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:36px minmax(0,1fr)}
+ .viewport-table .scoreboard{grid-column:1/-1}.viewport-table .felt{grid-row:2;grid-column:1}.viewport-table .hand-zone{grid-row:2;grid-column:2;border-top:0;border-left:1px solid #97714088;grid-template-rows:auto 26px auto minmax(0,1fr) 68px;padding:3px 6px;row-gap:2px}
+ .viewport-table .action-row{flex-direction:column;gap:3px;align-items:stretch}.viewport-table .action-row p{max-width:none;text-align:center;font-size:10px;max-height:14px;line-height:13px}
+ .viewport-table .play-buttons{gap:5px}.viewport-table .play-buttons button{padding:6px;min-height:48px;font-size:10px;flex:1}.viewport-table .play-buttons #play{min-width:0}
+ .viewport-table .team-summary{gap:4px;font-size:9px;justify-content:space-between}.viewport-table .team-member{font-size:9px}.viewport-table .team-summary strong{font-size:9px}.viewport-table .team-summary>.team-mark{display:none}.viewport-table .team-member small{font-size:7px}
+ .viewport-table .hand-top .eyebrow{display:none}.viewport-table .hand-top #sort{font-size:9px}.viewport-table .signal-buttons button{font-size:9px;padding:4px 6px;min-height:28px}
+ .viewport-table:not(.has-match) .play-area{grid-template-columns:1fr;grid-template-rows:36px minmax(0,1fr)}
+ .viewport-table .table-heading{max-height:50px}.viewport-table .live-move{font-size:10px}
+ .viewport-table .defense-preview{max-height:40px}.viewport-table .defense-heading h3{font-size:11px}.viewport-table #defense-status{font-size:10px;line-height:12px}
+}
+@media(prefers-reduced-motion:reduce){.viewport-table .hand .card{transition:none}}

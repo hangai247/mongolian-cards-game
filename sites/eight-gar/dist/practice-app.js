@@ -1,3 +1,4 @@
+import { keepLatestPlayVisible } from './viewport-table.js';
 import { advanceSignals, reconcileSignals, setSignal } from './rules/signals.js';
 import { mountTeamSignals } from './team-signals.js';
 import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader, canLeadThree, canLeadFive } from './rules/engine.js';
@@ -6,7 +7,6 @@ import { readSavedMatch } from './practice-save.js';
 import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { renderTableInsights, renderDefense } from './table-ui.js';
-import { normalizePreferences, PREFERENCES_KEY } from './table-insights.js';
 import { TableAtmosphere } from './atmosphere.js';
 const $ = id => document.getElementById(id);
 const NAMES = ['You', 'Temu', 'Bataa', 'Sarnai', 'Anu', 'Bold', 'Naraa', 'Oyu'];
@@ -17,29 +17,13 @@ const COMPUTER_TURN_DELAY_MS = 2500;
 let state = null, selected = new Set(), liveMove = '', paused = false, byRank = false, timer = null, toastTimer = null;
 let signals = [];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const mobileTable = matchMedia('(max-width: 700px)');
-let preferences = normalizePreferences(null);
-try { preferences = normalizePreferences(JSON.parse(localStorage.getItem(PREFERENCES_KEY))); } catch { /* Preferences remain usable without storage. */ }
 const atmosphere = new TableAtmosphere();
-const motionEnabled = () => preferences.motion && !reducedMotion.matches;
-const focusTable = () => preferences.focus && mobileTable.matches;
+atmosphere.configure({ sound: true, volume: .25 });
+const motionEnabled = () => !reducedMotion.matches;
 function stopEffects() { atmosphere.stop(); characterRoom.clearReaction?.(); }
-function updatePreferences() {
-  atmosphere.configure(preferences);
-  document.body.classList.toggle('focus-table', focusTable());
-  document.body.classList.toggle('motion-off', !motionEnabled());
-  $('focus-table').textContent = focusTable() ? 'Show portraits' : 'Focus table';
-  $('focus-table').setAttribute('aria-pressed', String(focusTable()));
-  $('sound-enabled').checked = preferences.sound;
-  $('sound-volume').value = Math.round(preferences.volume * 100);
-  $('sound-volume').disabled = !preferences.sound;
-  $('volume-value').textContent = `${Math.round(preferences.volume * 100)}%`;
-  $('motion-enabled').checked = motionEnabled();
-  $('motion-enabled').disabled = reducedMotion.matches;
-  try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Session preferences still apply. */ }
-}
 function changePresentation() {
-  stopEffects(); motionController?.abort(); updatePreferences();
+  stopEffects(); motionController?.abort();
+  document.body.classList.toggle('motion-off', !motionEnabled());
   if (!animating) render();
 }
 
@@ -172,6 +156,7 @@ function render(scene = state, motion = null) {
   const shownCounts = scene?.hands.map(hand => hand.length) ?? Array(8).fill(0);
   if (motion?.beforeCounts && ['pickup', 'refill'].includes(motion.type)) shownCounts[motion.player] = motion.beforeCounts[motion.player];
   $('seats').replaceChildren();
+  $('self-seat').replaceChildren();
   for (let index = 0; index < 8; index++) {
     const count = scene?.hands[index].length ?? 0;
     const shownCount = shownCounts[index];
@@ -195,10 +180,11 @@ function render(scene = state, motion = null) {
       }
       seat.append(fan);
     }
-    $('seats').append(seat);
+    $(index === 0 ? 'self-seat' : 'seats').append(seat);
   }
   renderTableInsights({ scene, motion, counts: shownCounts, names: NAMES, paused, animating });
-  characterRoom.update({handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, focused: focusTable(), motionEnabled: motionEnabled()}, motion);
+  characterRoom.update({handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
+  const pileScroll = $('highest').scrollLeft;
   $('highest').replaceChildren();
   $('pile-key').hidden = !scene?.table.pile.length;
   if (scene?.table.pile.length) {
@@ -215,6 +201,7 @@ function render(scene = state, motion = null) {
     }
   }
   else if (scene && scene.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'A fresh lead.'; $('highest').append(empty); }
+  keepLatestPlayVisible($('highest'), scene?.table.pile, pileScroll);
   $('turn-label').textContent = !scene ? 'YOUR SEAT IS READY' : scene.phase === 'choosing-leader' ? 'DEALT · TEAM DISCUSSION' : scene.phase !== 'playing' ? 'ROUND COMPLETE' : paused ? 'TABLE PAUSED' : scene.turn === 0 ? 'YOUR TURN' : `${NAMES[scene.turn].toUpperCase()}’S TURN`;
   if (motion) $('turn-label').textContent = ({pickup:'COLLECTING CARDS',play:'PLAYING CARDS',refill:'DRAWING RESERVE',sleep:'УНТАНА'})[motion.type];
   $('reserve-count').textContent = scene?.reserve.length ?? 3;
@@ -223,6 +210,7 @@ function render(scene = state, motion = null) {
   $('table-message').hidden = !paused || !scene || scene.phase !== 'playing';
   $('table-message').textContent = 'Take your time. The table is paused.';
   $('live-move').textContent = liveMove;
+  $('live-move').title = liveMove;
   $('live-move').hidden = !liveMove;
   renderHand(scene);
   if (motion?.player === 0 && motion.beforeCounts && ['pickup','refill'].includes(motion.type)) $('hand-count').textContent = `${motion.beforeCounts[0]} cards`;
@@ -347,8 +335,8 @@ $('continue').addEventListener('click', () => {
   }
 });
 $('round-dialog').addEventListener('cancel', event => event.preventDefault());
-function openDialog(id) { if (animating && id !== 'atmosphere-dialog') return; clearBot(); $(id).showModal(); }
-for (const [button, dialog] of [['rules-open', 'rules-dialog'], ['resources-open', 'resources-dialog'], ['atmosphere-open', 'atmosphere-dialog']]) $(button).addEventListener('click', () => openDialog(dialog));
+function openDialog(id) { if (animating) return; clearBot(); $(id).showModal(); }
+for (const [button, dialog] of [['rules-open', 'rules-dialog'], ['resources-open', 'resources-dialog']]) $(button).addEventListener('click', () => openDialog(dialog));
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
@@ -370,15 +358,7 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('resize', () => { if (animating) { stopEffects(); motionController?.abort(); } });
 reducedMotion.addEventListener('change', changePresentation);
-mobileTable.addEventListener('change', changePresentation);
-$('focus-table').addEventListener('click', () => { preferences.focus = !preferences.focus; changePresentation(); });
-$('sound-enabled').addEventListener('change', () => {
-  preferences.sound = $('sound-enabled').checked; updatePreferences();
-  if (preferences.sound) void atmosphere.unlock(); else stopEffects();
-});
-$('sound-volume').addEventListener('input', () => { preferences.volume = Number($('sound-volume').value) / 100; updatePreferences(); });
-$('motion-enabled').addEventListener('change', () => { preferences.motion = $('motion-enabled').checked; changePresentation(); });
 document.addEventListener('pointerdown', () => { void atmosphere.unlock(); }, { capture: true });
 document.addEventListener('keydown', () => { void atmosphere.unlock(); }, { capture: true });
-updatePreferences();
+document.body.classList.toggle('motion-off', !motionEnabled());
 restore(); render(); if (state && ['round-over', 'match-over'].includes(state.phase)) showRound();

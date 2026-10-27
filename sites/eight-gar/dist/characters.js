@@ -47,15 +47,15 @@ export class CharacterRoom {
     const {width,height}=this.host.getBoundingClientRect();if(!width||!height)return;
     this.width=width;this.height=height;
     if(this.renderer){this.renderer.setSize(width,height,false);Object.assign(this.camera,{left:-width/2,right:width/2,top:height/2,bottom:-height/2});this.camera.updateProjectionMatrix();}
-    for(const r of this.rigs){const p=seatLayout(width,r.seat);r.layout=p;r.mesh.scale.setScalar(p.height);r.mesh.position.set(p.x-width/2,height/2-p.top-p.height,p.z);r.mesh.renderOrder=p.z;}
-    for(const img of this.fallback.children){const p=seatLayout(width,Number(img.dataset.actor));Object.assign(img.style,{left:`${p.x-p.width/2}px`,top:`${p.top}px`,width:`${p.width}px`,height:`${p.height}px`,zIndex:p.z});}
+    for(const r of this.rigs){const p=seatLayout(width,r.seat,height);r.layout=p;r.mesh.scale.setScalar(p.height);r.mesh.position.set(p.x-width/2,height/2-p.top-p.height,p.z);r.mesh.renderOrder=p.z;}
+    for(const img of this.fallback.children){const p=seatLayout(width,Number(img.dataset.actor),height);Object.assign(img.style,{left:`${p.x-p.width/2}px`,top:`${p.top}px`,width:`${p.width}px`,height:`${p.height}px`,zIndex:Math.round(p.z*3)});}
     this.layoutCards();this.dirty=true;this.renderOnce();
   }
   layoutCards(){
     if(!this.width||this.snapshot?.focused)return;
     for(let seat=1;seat<8;seat++){
       const node=document.querySelector(`.seat-${seat}`);if(!node)continue;
-      const p=seatLayout(this.width,seat),fan=node.querySelector('.opponent-hand');
+      const p=seatLayout(this.width,seat,this.height),fan=node.querySelector('.opponent-hand');
       Object.assign(node.style,{left:`${p.x}px`,top:`${p.labelTop}px`});
       if(fan){const count=this.snapshot?.handCounts[seat]||0;const compression=count>12?.78:count>7?.88:1;
         Object.assign(fan.style,{left:`calc(50% + ${p.handX-p.x}px)`,top:`${p.handY-p.labelTop-82}px`,transform:`translateX(-50%) scale(${p.fanScale*compression})`});}

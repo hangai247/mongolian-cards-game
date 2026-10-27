@@ -31,13 +31,3 @@ export function defenseMessage(analysis, selectedCount, targetCount) {
   if (selectedCount < targetCount) return `${covered} of ${targetCount} covered — select ${targetCount - selectedCount} more card${targetCount - selectedCount === 1 ? '' : 's'}${covered < selectedCount ? ' and replace unused cards' : ''}.`;
   return `${covered} of ${targetCount} covered — replace unused cards to cover every target.`;
 }
-
-export const PREFERENCES_KEY = 'naiman-gar-table-preferences-v1';
-export function normalizePreferences(saved) {
-  return {
-    sound: typeof saved?.sound === 'boolean' ? saved.sound : true,
-    volume: typeof saved?.volume === 'number' && Number.isFinite(saved.volume) ? Math.min(1, Math.max(0, saved.volume)) : .25,
-    motion: typeof saved?.motion === 'boolean' ? saved.motion : true,
-    focus: saved?.focus === true,
-  };
-}

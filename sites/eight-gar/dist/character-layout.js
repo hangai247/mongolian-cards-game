@@ -1,7 +1,17 @@
 // Public presentation coordinates shared by the artwork, badges and live card fans.
 export const CHARACTER_NAMES = ['temu','bataa','sarnai','anu','bold','naraa','oyu'];
-export function seatLayout(width, seat) {
+export function seatLayout(width, seat, availableHeight) {
   if (!Number.isFinite(width) || width <= 0 || !Number.isInteger(seat) || seat < 1 || seat > 7) throw new RangeError('Invalid seat layout');
+  if (availableHeight !== undefined) {
+    if (!Number.isFinite(availableHeight) || availableHeight <= 0) throw new RangeError('Invalid portrait band height');
+    const i = seat - 1, slot = width / 7, near = Math.abs(i - 3) / 3;
+    const labelHeight = width <= 700 ? 34 : 40;
+    const height = Math.max(12, Math.min(availableHeight - labelHeight - 4, slot * 1.28)) * (1 - .08 * (1 - near));
+    const top = Math.max(labelHeight, availableHeight - height);
+    const x = (i + .5) * slot;
+    return { x, top, width: height * .75, height, labelTop: 2, handX: x, handY: top + height * .84,
+      fanScale: Math.min(1, height / 305, slot / 150), z: near };
+  }
   const i = seat - 1, mobile = width <= 700;
   const scale = mobile ? Math.min(width / 390, 1.4) : Math.min(width / 1440, 1.22);
   const x = (mobile ? [.12,.15,.33,.50,.67,.85,.88] : [.07,.22,.36,.50,.64,.78,.93])[i] * width;

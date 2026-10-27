@@ -25,11 +25,12 @@ export function renderTableInsights({ scene, motion, counts, names, paused = fal
   const sleepText = progress === 8 ? (motion?.type === 'sleep' ? 'Унтана — pile asleep.' : 'Eight plays — reserve draws finish before the pile sleeps.') : progress === 7
     ? 'One more successful beat puts the pile to sleep. The eighth player leads again unless they win.' : '';
   setText($('sleep-note'), meter.hidden ? '' : sleepText);
+  meter.title = sleepText || 'One lead and seven successful defenses put the pile to sleep.';
 
   const guidance = scene ? turnGuidance(scene, animating ? motion ?? { player: scene.turn } : null) : null;
   const note = $('turn-order-note');
   setText(note, paused ? '' : guidance?.note ?? ''); note.hidden = !note.textContent;
-  for (const node of document.querySelectorAll('#seats .seat')) {
+  for (const node of document.querySelectorAll('#seats .seat, #self-seat .seat')) {
     const seat = Number(node.dataset.player), ours = seat % 2 === 0;
     node.prepend(teamMark(ours));
     node.classList.toggle('next-seat', !paused && guidance?.next === seat);
@@ -72,7 +73,8 @@ export function renderDefense({ active, hand, selected, targets, trump }) {
     const targetNode = document.createElement('span'); targetNode.className = `defense-card${['hearts', 'diamonds'].includes(target.suit) ? ' red' : ''}`; targetNode.textContent = label(target);
     targetNode.setAttribute('aria-label', target.kind === 'joker' ? label(target) : `${target.rank} of ${target.suit}`);
     const result = document.createElement('span'); result.className = 'defense-result';
-    result.textContent = card ? `✓ beaten by ${label(card)}` : '○ Not covered';
+    result.textContent = card ? `← ${label(card)} ✓` : '○ Not covered';
+    result.setAttribute('aria-label', card ? `beaten by ${label(card)}` : 'Not covered');
     row.append(targetNode, result); return row;
   }));
   const unused = analysis.unmatchedCandidateIndices.map(index => label(cards[index]));

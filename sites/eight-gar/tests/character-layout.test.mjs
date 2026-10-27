@@ -32,3 +32,16 @@ test('brief reaction envelopes are bounded and disabled by still mode',()=>{
     assert.deepEqual(poseFor({seat:2,still:true,reaction,reactionType}),{breath:0,head:0,lean:0,reach:0});
   }
 });
+
+test('viewport portrait bands keep every face inside the measured space',()=>{
+  for(const [width,height] of [[320,88],[390,143],[450,94],[700,146],[1440,252]]){
+    let previous=-1;
+    for(let seat=1;seat<8;seat++){
+      const p=seatLayout(width,seat,height);
+      assert(p.x>previous);previous=p.x;
+      assert(p.x-p.width/2>=0&&p.x+p.width/2<=width);
+      assert(p.top>=30&&p.top+p.height<=height+1);
+      assert(p.labelTop>=0&&p.labelTop<p.top);
+    }
+  }
+});

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chainProgress, teamSummary, turnGuidance, normalizePreferences, defenseMessage } from '../dist/table-insights.js';
+import { chainProgress, teamSummary, turnGuidance, defenseMessage } from '../dist/table-insights.js';
 import { createDeck, createMatch, applyAction, RANKS } from '../../../dist/engine.js';
 import { transitionSteps } from '../dist/presentation.js';
 import { sceneFromView } from '../dist/scene.js';
@@ -45,11 +45,6 @@ test('pickup at seven resets progress and hands lead to the next seat',()=>{
   const pile=RANKS.slice(0,7).map(s),before=fixture({turn:7,hands:{7:[h('A')]},pile,highest:pile.slice(-1),size:1});
   const result=applyAction(before,{type:'pickup',player:7,expectedRevision:before.revision});
   assert.equal(chainProgress(result.state.table),0);assert.equal(turnGuidance(result.state).current,0);
-});
-test('preferences are bounded and incomplete saved preferences retain cozy defaults',()=>{
-  assert.deepEqual(normalizePreferences(null),{sound:true,volume:.25,motion:true,focus:false});
-  assert.equal(normalizePreferences({volume:Infinity}).volume,.25);assert.equal(normalizePreferences({volume:2}).volume,1);
-  assert.equal(normalizePreferences({focus:true}).focus,true);
 });
 test('coverage copy distinguishes count problems, invalid combinations and success',()=>{
   assert.match(defenseMessage({assignments:[{},{}]},2,3),/select 1 more card/);
