@@ -4,13 +4,11 @@ import {
   type Action, type Event as EngineEvent, type State, type Team,
 } from 'mongolian-eight-gar-engine';
 import { findPlay, chooseComputerLeader } from 'mongolian-eight-gar-engine/strategy';
-import { advanceSignals, setSignal, type SetSize } from 'mongolian-eight-gar-engine/signals';
 import type { Timing } from '../config.js';
 import type { Cause, ClientEvent } from '../protocol.js';
 import { RoomError, SEAT_COUNT, type GameMeta, type Player, type RoomSnapshot, type SeatSlot } from './model.js';
 
 export type Command =
-  | { readonly type: 'signal'; readonly playerId: string; readonly size: SetSize; readonly enabled: boolean; readonly expectedRevision: number }
   | { readonly type: 'join'; readonly playerId: string; readonly name: string }
   | { readonly type: 'leave'; readonly playerId: string }
   | { readonly type: 'connect'; readonly playerId: string }
@@ -45,8 +43,6 @@ export interface Audit {
 }
 
 export interface Result {
-  /** Signal-only commits must reach this team only. */
-  readonly signalTeam?: Team;
   readonly snapshot: RoomSnapshot;
   /** Raw engine events; the runtime localizes them per seat (refilled cards are private). */
   readonly engineEvents: readonly EngineEvent[];
@@ -168,8 +164,6 @@ function refreshGame(snapshot: RoomSnapshot, timing: Timing): RoomSnapshot {
 function transition(snapshot: RoomSnapshot, state: State, ctx: Ctx, cause: Cause, patch: Partial<GameMeta> = {}): RoomSnapshot {
   const closing = state.phase === 'round-over' || state.phase === 'match-over';
   const game: GameMeta = {
-    signals: advanceSignals(cause === 'deal' ? null : snapshot.game?.state ?? null, state, snapshot.game?.signals,
-      snapshot.seats.flatMap((slot, seat) => slot.kind === 'bot' ? [seat] : [])),
     state, phaseSince: ctx.now, deadline: null, timer: null,
     reviewUntil: closing ? ctx.now + ctx.timing.roundReviewMs : null,
     leaderConfirmedBy: snapshot.game?.leaderConfirmedBy ?? null,
@@ -234,18 +228,6 @@ function removePlayer(snapshot: RoomSnapshot, player: Player, ctx: Ctx, kind: st
 
 export function applyCommand(snapshot: RoomSnapshot, command: Command, ctx: Ctx): Result {
   switch (command.type) {
-    case 'signal': {
-      const player = requirePlayer(snapshot, command.playerId);
-      const slot = snapshot.seats[player.seat];
-      if (slot?.kind !== 'human' || slot.playerId !== player.id) throw new RoomError('NOT_SEATED', 'A computer is playing this seat.');
-      const game = requireGame(snapshot);
-      const signals = setSignal(game.state, game.signals, player.seat, command.size, command.enabled, command.expectedRevision);
-      if (JSON.stringify(signals) === JSON.stringify(game.signals ?? [])) return unchanged(snapshot);
-      return commit({ ...snapshot, game: { ...game, signals } }, ctx, {
-        engineEvents: [], roomEvents: [], cause: 'action', rosterChanged: false, gameChanged: false,
-        signalTeam: TEAMS[player.seat]!, audit: null,
-      });
-    }
     case 'join': {
       if (snapshot.players[command.playerId]) return unchanged(snapshot);
       requireLobby(snapshot);

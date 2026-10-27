@@ -15,10 +15,6 @@
     "./strategy": {
       "types": "./dist/strategy.d.ts",
       "import": "./dist/strategy.js"
-    },
-    "./signals": {
-      "types": "./dist/signals.d.ts",
-      "import": "./dist/signals.js"
     }
   },
   "workspaces": [
