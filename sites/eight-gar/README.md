@@ -8,7 +8,7 @@ Networked client for the Mongolian eight-player team card game. Eight humans (or
 2. Friends join with the link or code. Everyone picks a seat by clicking an empty one; seats alternate between the two teams.
 3. The host can **Fill with computers** for empty seats, then **Deal cards** once all eight seats are filled.
 4. After each deal the opening team discusses on voice; any member of that team confirms the agreed opener. Everyone else sees who confirmed.
-5. Play as usual: lead, beat or pick up. Every turn has a 60-second clock. If it runs out, the server plays the lowest safe legal move for that seat.
+5. Play as usual: lead, beat or pick up. Every turn has a three-minute clock. If it runs out, the server plays the lowest safe legal move for that seat.
 6. When a round ends the whole table gets a 10-second review window with the final pile visible, then any player on the winning team (or the host) deals the next round; the server deals automatically after 60 seconds.
 7. After a match the host can start a rematch in the same seats.
 

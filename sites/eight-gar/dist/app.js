@@ -261,7 +261,8 @@ function renderTimer() {
   timer.hidden = !show;
   if (!show) { lastTimerText = ''; return; }
   const left = Math.max(0, Math.ceil((deadline - serverNow()) / 1000));
-  const text = scene.phase === 'choosing-leader' ? `Decision in ${left} s` : `${scene.turn === 0 ? 'Your clock' : 'Clock'} ${left} s`;
+  const clock = left >= 60 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : `${left} s`;
+  const text = scene.phase === 'choosing-leader' ? `Decision in ${clock}` : `${scene.turn === 0 ? 'Your clock' : 'Clock'} ${clock}`;
   if (text !== lastTimerText) { timer.textContent = text; lastTimerText = text; }
   timer.classList.toggle('urgent', left <= 10 && scene.turn === 0);
 }
