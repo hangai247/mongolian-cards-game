@@ -4,11 +4,11 @@ import { availableSetSizes, signalsForPlayer } from './rules/signals.js';
 export function mountTeamSignals({ container, onToggle }) {
   const panel = document.createElement('section');
   panel.className = 'team-signals';
-  panel.setAttribute('aria-label', 'Private team signals');
+  panel.setAttribute('aria-label', 'Багийн нууц дохио');
   panel.hidden = true;
   const label = document.createElement('p');
   label.className = 'signal-label';
-  label.textContent = 'Only your team can see';
+  label.textContent = 'Зөвхөн танай баг харна';
   const buttons = document.createElement('div');
   buttons.className = 'signal-buttons';
   const status = document.createElement('span');
@@ -21,7 +21,7 @@ export function mountTeamSignals({ container, onToggle }) {
     button.type = 'button';
     button.className = 'quiet-button';
     button.dataset.signalSize = String(size);
-    button.textContent = `${size}-card set`;
+    button.textContent = `${size} хөзрийн багц`;
     button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => {
       if (!current || button.disabled) return;
@@ -43,10 +43,10 @@ export function mountTeamSignals({ container, onToggle }) {
         const enabled = visible.some(signal => signal.seat === seat && signal.size === size);
         button.setAttribute('aria-pressed', String(enabled));
         button.disabled = !active || busy || (!enabled && !available.includes(size));
-        button.title = enabled ? 'Clear this signal' : available.includes(size) ? 'Tell your teammates you hold this set' : `Your hand needs a real ${size}-card set`;
+        button.title = enabled ? 'Энэ дохиог арилгах' : available.includes(size) ? 'Энэ багц гартаа байгааг багтаа мэдэгдэх' : `Гартаа ${size} хөзрийн багцтай байх шаардлагатай`;
       }
       const own = visible.filter(signal => signal.seat === seat).map(signal => signal.size);
-      const message = own.length ? `Sharing: ${own.join(' and ')}-card set${own.length > 1 ? 's' : ''}` : 'No signal shared';
+      const message = own.length ? `Мэдэгдсэн: ${own.join(' болон ')} хөзрийн багц` : 'Дохио өгөөгүй';
       if (status.textContent !== message) status.textContent = message;
       for (const player of document.querySelectorAll('.seat[data-player]')) {
         const name = player.querySelector('.seat-name');
@@ -61,8 +61,8 @@ export function mountTeamSignals({ container, onToggle }) {
         badges.replaceChildren(...sizes.map(size => {
           const badge = document.createElement('span');
           badge.className = 'set-signal'; badge.textContent = String(size);
-          badge.title = `${size}-card set · only your team`;
-          badge.setAttribute('aria-label', `${size}-card set shared with your team`);
+          badge.title = `${size} хөзрийн багц · зөвхөн танай баг`;
+          badge.setAttribute('aria-label', `${size} хөзрийн багцыг танай багт мэдэгдсэн`);
           return badge;
         }));
       }

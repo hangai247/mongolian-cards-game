@@ -1,0 +1,44 @@
+/* Keep round results in the hand dock, leaving the public pile interactive. */
+.viewport-table .hand-zone:has(.round-review[open]) {
+  grid-template-rows: auto 32px auto minmax(48px, 1fr) auto;
+}
+.viewport-table #round-dialog.round-review {
+  grid-area: defense;
+  position: static;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  max-height: 150px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: none;
+  text-align: left;
+  overflow: auto;
+}
+.viewport-table #round-dialog.round-review[open] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.round-review-copy { min-width: 0; }
+.viewport-table #round-dialog .dialog-top .eyebrow { margin: 0; }
+.viewport-table #round-dialog #result-icon { display: none; }
+.viewport-table #round-dialog h2 { margin: 3px 0; font-size: 18px; }
+.viewport-table #round-dialog .dialog-intro,
+.viewport-table #round-dialog .review-note { margin: 3px 0 0; font-size: 11px; line-height: 1.35; }
+.viewport-table #round-dialog .button { width: auto; min-height: 44px; flex-shrink: 0; padding: 8px 12px; font-size: 11px; }
+.hand-zone:has(.round-review[open]) .action-row > p,
+.hand-zone:has(.round-review[open]) .play-buttons > button { display: none; }
+/* Voice stays available for discussing the finished round. */
+.hand-zone:has(.round-review[open]) .action-row:not(:has(.voice-button:not([hidden]))) { display: none; }
+.hand-zone:has(.round-review[open]) .action-row { justify-content: flex-end; }
+@media (max-width: 700px), (max-height: 500px) {
+  .viewport-table #round-dialog.round-review[open] { flex-wrap: wrap; gap: 5px; padding: 6px 8px; }
+  .viewport-table #round-dialog h2 { font-size: 15px; margin: 2px 0; }
+  .viewport-table #round-dialog .dialog-intro,
+  .viewport-table #round-dialog .review-note { font-size: 10px; line-height: 1.25; }
+  .viewport-table #round-dialog .button { width: 100%; }
+}

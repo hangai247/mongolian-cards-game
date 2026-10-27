@@ -1,0 +1,21 @@
+/* A compact suit-only card beside the round information. */
+.viewport-table .round-meta{display:flex;align-items:center;gap:8px;text-align:left;flex-shrink:0}
+.viewport-table .trump-card{position:relative;flex:0 0 20px;width:20px;height:28px;border:1px solid #d6bc86;border-radius:3px;background:linear-gradient(115deg,#fffdf5,#f5e9ce);color:#191917;box-shadow:0 2px 5px #0006,inset 0 0 0 2px #fff8e9}
+.viewport-table .trump-card[data-suit=hearts],.viewport-table .trump-card[data-suit=diamonds]{color:#b5232c}
+.viewport-table .round-meta .trump-card span{position:absolute;display:block;margin:0;color:inherit;font-family:Georgia,'Times New Roman',serif;line-height:1;letter-spacing:0}
+.viewport-table .round-meta .trump-card .trump-pip{inset:0;display:grid;place-items:center;font-size:18px}
+.viewport-table .trump-details{display:grid;gap:2px}
+.viewport-table .trump-details #round-label{font-size:8px;margin:0;letter-spacing:.7px}
+.viewport-table .trump-details small{font-size:9px;line-height:1.1;color:#cdb98e}
+.viewport-table .trump-details #trump-name{font-size:12px;line-height:1.2;color:#fff0d2}
+@media(max-width:700px){
+ .viewport-table .scoreboard{gap:4px;padding-inline:8px}
+ .viewport-table .round-meta{gap:6px}
+ .viewport-table .trump-details #trump-name{font-size:10px}
+ .viewport-table .trump-details #round-label{font-size:7px}
+}
+@media(max-width:380px){
+ .viewport-table .scoreboard .team-score{gap:4px}
+ .viewport-table .scoreboard .team-score strong{font-size:9px}
+ .viewport-table .scoreboard .score-dots{display:none}
+}

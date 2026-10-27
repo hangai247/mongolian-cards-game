@@ -8,7 +8,7 @@ const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;awa
 function check(width,height,label){
  const doc=frame.contentDocument;
  assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,label+': page fits');
- for(const id of ['rules-open','new-match','copy-link','voice-mic','welcome','hand','play','pickup','hint']){
+ for(const id of ['rules-open','new-match','copy-link','voice-mic','welcome','discussion','opening-players','confirm-opener','hand','play','pickup','hint']){
   const node=doc.getElementById(id);if(!node||!node.getClientRects().length)continue;const box=node.getBoundingClientRect();
   assert(box.width>0&&box.height>0&&box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height+1,label+': '+id+' visible');
  }
@@ -23,10 +23,15 @@ document.querySelector('#run').onclick=async()=>{
   const name=doc.querySelector('#lobby-name');name.value='Alexanderthegreat';name.dispatchEvent(new Event('input',{bubbles:true}));doc.querySelector('#create').click();
   await waitFor(()=>!doc.querySelector('#lobby-room').hidden);
   check(320,568,'320×568 room');
-  doc.querySelector('#voice-join').hidden=false;doc.querySelector('#conn-status').hidden=false;check(320,568,'320×568 voice and reconnect controls');
+  doc.querySelector('#voice-mic').hidden=false;doc.querySelector('#conn-status').hidden=false;check(320,568,'320×568 voice and reconnect controls');
   doc.querySelector('#fill-bots').click();await waitFor(()=>!doc.querySelector('#start-game').disabled);doc.querySelector('#start-game').click();
   await waitFor(()=>doc.body.classList.contains('has-match'));
   for(const [width,height] of [[320,568],[568,320],[390,844],[700,900],[844,390],[1440,900]]){frame.width=width;frame.height=height;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));check(width,height,`${width}×${height} game`);}
+  if(!doc.querySelector('#human-discussion').hidden&&!doc.querySelector('#discussion').hidden){
+   const choices=doc.querySelectorAll('.seat-opener[role=radio]');assert(choices.length===4,'online opener has four cards');
+   choices[0].click();assert(!doc.querySelector('#confirm-opener').disabled,'online selection enables confirmation');
+   doc.querySelector('#confirm-opener').click();await waitFor(()=>doc.querySelector('#discussion').hidden);assert(true,'server accepts the chosen opener');
+  }
   frame.width=390;frame.height=844;status.textContent='All online viewport checks passed';
  }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}
 };

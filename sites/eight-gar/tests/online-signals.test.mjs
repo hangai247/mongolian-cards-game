@@ -49,7 +49,7 @@ test('disconnect, stale request errors and changing rooms cannot leave active co
   net.fire('State', { version: 10, game: { view: view(0), signals: [{ seat: 0, size: 3 }] } });
   net.request = async event => { if (event === 'game:signal') throw Object.assign(new Error('Hand changed'), { code: 'STALE_ACTION' }); net.calls.push([event]); };
   await toggle(3, false);
-  assert.deepEqual(errors, ['Hand changed']); assert.deepEqual(net.calls.at(-1), ['room:sync']);
+  assert.deepEqual(errors, ['Тоглоомын байдал өөрчлөгдлөө. Дахин шалгаад оролдоно уу.']); assert.deepEqual(net.calls.at(-1), ['room:sync']);
   net.connected = false; net.fire('Connection', false); assert(frames.at(-1).busy);
   const other = client(); controls.connect(other);
   net.fire('Signals', { version: 11, revision: 4, signals: [{ seat: 0, size: 3 }] });

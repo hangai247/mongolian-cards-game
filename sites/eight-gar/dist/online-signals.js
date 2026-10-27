@@ -1,3 +1,4 @@
+import { errorText } from './locale-mn.js';
 import { mountTeamSignals } from './team-signals.js';
 import { signalsForPlayer } from './rules/signals.js';
 import { displaySeat } from './scene.js';
@@ -14,7 +15,7 @@ export function createOnlineSignalControls({ container, onError, mount = mountTe
       await connection.request('game:signal', { size, enabled, expectedRevision: view.revision });
     } catch (error) {
       if (epoch !== requestEpoch) return;
-      onError(error.message);
+      onError(errorText(error));
       if (error.code === 'STALE_ACTION') void connection.request('room:sync').catch(() => {});
     } finally {
       if (epoch === requestEpoch) { busy = false; render(); }

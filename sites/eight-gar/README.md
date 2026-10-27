@@ -7,7 +7,7 @@ Networked client for the Mongolian eight-player team card game. Eight humans (or
 1. Open the site, pick a name and **Open a new table**. You get a six-character code and a link (`/r/CODE`) to share.
 2. Friends join with the link or code. Everyone picks a seat by clicking an empty one; seats alternate between the two teams.
 3. The host can **Fill with computers** for empty seats, then **Deal cards** once all eight seats are filled.
-4. After each deal the opening team discusses on voice; any member of that team confirms the agreed opener. Everyone else sees who confirmed.
+4. After each deal the opening team discusses on voice; choose a teammate card and explicitly confirm the agreed opener. Arrow keys also move the selection, and the choice survives table updates. Everyone else sees who confirmed.
 5. Play as usual: lead, beat or pick up. Every turn has a three-minute clock. If it runs out, the server plays the lowest safe legal move for that seat.
 6. When a round ends the whole table gets a 10-second review window with the final pile visible, then any player on the winning team (or the host) deals the next round; the server deals automatically after 60 seconds.
 7. After a match the host can start a rematch in the same seats.
@@ -22,10 +22,16 @@ Reload or reopen the link at any time: the session token in this browser puts yo
 | `dist/scene.js` | Pure rotation of the server `PlayerView` into the renderer's State-shaped scene (viewer at display seat 0, placeholders for hidden cards) |
 | `dist/net.js` | HTTP room endpoints, session storage, socket.io wrapper with acked requests and clock offset |
 | `dist/voice.js` | LiveKit audio-only wrapper: voice joins automatically when you sit down (listening, mic muted), one button unmutes, per-seat mic badges, active speakers, a tap-to-hear prompt when the browser blocks autoplay, token refresh |
-| `dist/presentation.js`, `dist/motion.js`, `dist/characters.js`, `dist/character-layout.js` | Unchanged animation and 2.5D renderer; they receive only counts and public cards |
+| `dist/presentation.js`, `dist/motion.js`, `dist/photographic-room.js`, `dist/room-layout.js` | Committed card animation and a photographic room with live viewer-relative seat labels; only public counts and cards enter presentation |
 | `dist/vendor/` | Three.js and livekit-client bundles with licenses |
 
 `engine.js` and `strategy.js` are served by the game server from the root engine build, so there is a single source of rules. `index.html` uses `<base href="/">` because tables live under `/r/CODE`.
+
+## Interface language
+
+Online and practice interfaces use Mongolian Cyrillic (`lang="mn"`), including the player rulebook, accessibility labels, game messages and voice controls. `dist/locale-mn.js` provides shared card labels, computer-player names and error-code translations. Render errors through `errorText` instead of showing raw engine or server messages. Human display names and standard card ranks remain unchanged. Code identifiers, protocol values, saved data, diagnostics and technical documentation stay in English; localization does not change the game rules.
+
+Round and match results use a nonmodal panel in the hand dock (`dist/round-review.css`). The final table pile remains visible as a stack and available to enlarge while online review and deal timers continue. Voice controls remain available. To verify the layout and next-deal flow at desktop, portrait and landscape sizes, serve the repository on a disposable local origin and run `tests/round-review-qa.html`; it writes practice fixtures to that origin's browser storage.
 
 ## Run locally
 
@@ -50,12 +56,14 @@ The common `team-signals.js` controls accept only a viewer’s hand and filtered
 
 While defending, the preview pairs selected cards with the latest targets and explains incomplete coverage, unused cards, and joker restrictions. `analyzeDefense(candidate, target, trump)` in the engine returns maximum one-to-one coverage, unmatched indices, and legality. Stable card-ID tie-breaking keeps equivalent mappings consistent through hand sorting. `beatsSet` retains its original boolean contract and rules.
 
-Both practice and online tables fit in one dynamic viewport. Portraits always stay visible in a measured band above the felt, with a fixed hand and action area below. Short landscape screens place the hand beside the table. Large hands and accumulated piles scroll within their own areas; new plays scroll the latest target into view, while ordinary redraws preserve manual scrolling and card selection. Rules, lobby content, and review dialogs scroll internally when needed.
+Both practice and online tables fit in one dynamic viewport. Seven players sit along both sides and the far edge of a generated photographic table, seen from the viewer’s eighth seat, with a fixed hand and action area below. The wide and portrait compositions use one coordinate map for their live seat labels, public card fans and animation destinations; the image is never stretched. Names, counts, team signals and cards remain live UI. Eligible teammate seats become the opener choices, including the viewer at the near rail. The old row picker is no longer shown. Short landscape screens place the hand beside the table. Large hands scroll within their own area while preserving scroll position and card selection. Table plays overlap in chronological order, with the ranks and suits of every earlier level exposed and every card in the latest play fully visible on top; the pile count opens all accumulated cards for review. Rules, lobby content, and review dialogs scroll internally when needed.
 
-Practice atmosphere is always enabled. Short sounds are synthesized locally with Web Audio at 25% after interaction; no media service or runtime network request is needed. A device reduced-motion preference skips flying cards and settles character poses. Reactions remain brief. Effects stop on cancellation, pause, tab hiding, or a fresh match. Restoring a save does not replay sounds or reactions.
+Practice atmosphere is always enabled. Short sounds are synthesized locally with Web Audio at 25% after interaction; no media service or runtime network request is needed. A device reduced-motion preference skips flying cards and seat reactions. The photographic people are static artwork; bounded seat highlights acknowledge pickups and wins. The room requires no WebGL. Effects stop on cancellation, pause, tab hiding, or a fresh match. Restoring a save does not replay sounds or reactions.
 
-The Atmosphere and Focus table controls have been removed, and their obsolete stored preferences are ignored. `viewport-table.css` owns the shared viewport layout; `practice-table.css` retains the practice insights styling. Match saves and the server protocol are unchanged.
+The Atmosphere and Focus table controls have been removed, and their obsolete stored preferences are ignored. `viewport-table.css` owns the shared viewport layout, while `realistic-table.css` and `room-layout.js` align its overlays with the artwork; `practice-table.css` retains the practice insights styling. Match saves and the server protocol are unchanged.
 
 Verification: `npm run check` at the repository root, `npm test -w sites/eight-gar`, and `npm test -w server`. For repeatable browser checks, serve the repository root on a separate local test origin and open `sites/eight-gar/tests/browser-qa.html`. The runner uses disposable browser saves on that origin and exercises 320/390/700/1440px layouts, defense pairing, sleep/refill/win transitions, large pickups, layout cancellation, orientation, and unavailable audio/WebGL and reduced-motion fallbacks. It must not run against a browser origin containing a match you want to retain.
 
 The viewport runner also covers 568×320 and 844×390 landscape screens, main mobile touch targets, and obsolete preferences. `tests/online-viewport-qa.html` checks the real lobby, room and game layout, plus visible voice/reconnect controls. To run it, temporarily symlink it into `dist/` on a disposable local game server, open that URL, then remove the symlink before publishing. It creates test rooms and fills them with computers.
+
+Generated artwork: `dist/assets/table-room-v2.jpg` and `table-room-mobile-v2.jpg`. Exact built-in image generation prompts are recorded in `dist/assets/table-room-v2-prompts.md`. Original art is retained separately.

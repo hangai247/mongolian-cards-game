@@ -6,10 +6,12 @@ export function seatLayout(width, seat, availableHeight) {
     if (!Number.isFinite(availableHeight) || availableHeight <= 0) throw new RangeError('Invalid portrait band height');
     const i = seat - 1, slot = width / 7, near = Math.abs(i - 3) / 3;
     const labelHeight = width <= 700 ? 34 : 40;
-    const height = Math.max(12, Math.min(availableHeight - labelHeight - 4, slot * 1.28)) * (1 - .08 * (1 - near));
-    const top = Math.max(labelHeight, availableHeight - height);
+    // Bring the end seats forward and lift the center seats along the oval's far rail.
+    const arc = Math.min(32, availableHeight * .16), curve = near * near;
+    const height = Math.max(12, Math.min(availableHeight - labelHeight - arc - 4, slot * 1.28)) * (1 - .08 * (1 - near));
+    const top = availableHeight - arc * (1 - curve) - height;
     const x = (i + .5) * slot;
-    return { x, top, width: height * .75, height, labelTop: 2, handX: x, handY: top + height * .84,
+    return { x, top, width: height * .75, height, labelTop: 2 + arc * curve, handX: x, handY: top + height * .84,
       fanScale: Math.min(1, height / 305, slot / 150), z: near };
   }
   const i = seat - 1, mobile = width <= 700;

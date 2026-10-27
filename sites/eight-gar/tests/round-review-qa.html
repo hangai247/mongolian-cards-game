@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><title>Round review regression checks</title>
+<style>body{margin:0;background:#eee;color:#222;font:14px system-ui}header{padding:8px}iframe{display:block;border:0;margin:auto}pre{white-space:pre-wrap;max-height:150px;overflow:auto}</style>
+<header><button id="run">Run review checks</button><span id="status">Ready</span></header><pre id="output"></pre><iframe id="game" title="Round review preview"></iframe>
+<script type="module">
+import { createDeck, createMatch } from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const assert=(condition,label)=>{if(!condition)throw Error(label);output.textContent+='✓ '+label+'\n';};
+const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('Timed out');};
+function fixture(matchOver){
+ const deck=createDeck(),pile=deck.filter(card=>card.suit==='spades'&&['7','8'].includes(card.rank));
+ const pool=deck.filter(card=>!pile.includes(card)),hands=[[],...Array.from({length:7},()=>pool.splice(0,5))];hands[7].push(...pool);
+ return {...createMatch(deck,0),hands,reserve:[],table:{pile,highest:pile.slice(-1)},phase:matchOver?'match-over':'round-over',winner:0,scores:[matchOver?5:1,0],round:matchOver?5:1};
+}
+async function load(matchOver,width,height){
+ frame.width=width;frame.height=height;
+ localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state:fixture(matchOver),byRank:false,signals:[]}));
+ const ready=new Promise(resolve=>frame.onload=resolve);frame.src='../dist/practice.html?review='+Date.now();await ready;
+ await waitFor(()=>frame.contentDocument.querySelector('#round-dialog')?.open);
+ return frame.contentDocument;
+}
+document.querySelector('#run').onclick=async()=>{
+ output.textContent='';status.textContent='Running';
+ try{
+  for(const matchOver of [false,true])for(const [width,height] of [[320,568],[390,844],[568,320],[844,390],[1440,900]]){
+   const doc=await load(matchOver,width,height),panel=doc.querySelector('#round-dialog'),pile=doc.querySelector('#highest'),expand=doc.querySelector('#pile-open');
+   const label=`${width}×${height} ${matchOver?'match':'round'} review`;
+   assert(!panel.matches(':modal'),label+': results do not block the page');
+   const resultBox=panel.getBoundingClientRect(),pileBox=pile.getBoundingClientRect();
+   assert(resultBox.top>=pileBox.bottom||resultBox.left>=pileBox.right,label+': results do not cover the table');
+   const button=doc.querySelector('#continue'),box=button.getBoundingClientRect();
+   assert(box.top>=0&&box.bottom<=height+1&&box.left>=0&&box.right<=width+1,label+': continue button fits');
+   assert(panel.scrollHeight<=panel.clientHeight+1,label+': result text fits without scrolling');
+   const target=expand.getBoundingClientRect();
+   assert(expand.contains(doc.elementFromPoint(target.x+target.width/2,target.y+target.height/2)),label+': pile inspection is clickable');
+   expand.click();assert(doc.querySelector('#pile-dialog').matches(':modal'),label+': enlarged pile opens');
+   assert(doc.querySelectorAll('#pile-cards .card').length===2,label+': final cards are available');
+   doc.querySelector('#pile-dialog [data-close]').click();assert(panel.open,label+': results persist after inspection');
+   button.click();assert(!panel.open&&!doc.querySelector('#discussion').hidden,label+': next deal works');
+  }
+  await load(false,390,844);status.textContent='All review checks passed';
+ }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}
+};
+</script>

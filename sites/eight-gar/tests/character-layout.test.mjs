@@ -43,5 +43,9 @@ test('viewport portrait bands keep every face inside the measured space',()=>{
       assert(p.top>=30&&p.top+p.height<=height+1);
       assert(p.labelTop>=0&&p.labelTop<p.top);
     }
+    const edge=seatLayout(width,1,height),center=seatLayout(width,4,height),opposite=seatLayout(width,7,height);
+    assert(edge.handY>center.handY,'end seats sit forward along the curved rail');
+    assert(edge.labelTop>center.labelTop,'nameplates follow the seating arc');
+    assert.equal(edge.handY,opposite.handY,'the arc is symmetric');
   }
 });

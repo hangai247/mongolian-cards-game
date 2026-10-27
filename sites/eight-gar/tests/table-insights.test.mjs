@@ -26,8 +26,8 @@ test('next player wraps around and the seventh play explains the conditional tur
   const base={phase:'playing',turn:7,table:{pile:[],highest:[]}};
   assert.equal(turnGuidance(base).next,0);
   const seventh={...base,table:{pile:Array(7),highest:[{}]}};
-  assert.equal(turnGuidance(seventh).currentLabel,'Beat → lead again');assert.equal(turnGuidance(seventh).nextLabel,'After pickup');
-  assert.match(turnGuidance(seventh).note,/unless the round ends/);
+  assert.equal(turnGuidance(seventh).currentLabel,'Дарвал → дахин эхэлнэ');assert.equal(turnGuidance(seventh).nextLabel,'Авбал дараагийнх');
+  assert.match(turnGuidance(seventh).note,/Үе дуусаагүй бол/);
   assert.equal(turnGuidance(seventh,{type:'sleep',player:7}).next,null);
   for(const phase of ['choosing-leader','round-over','match-over'])assert.equal(turnGuidance({...base,phase}).next,null);
 });
@@ -47,9 +47,9 @@ test('pickup at seven resets progress and hands lead to the next seat',()=>{
   assert.equal(chainProgress(result.state.table),0);assert.equal(turnGuidance(result.state).current,0);
 });
 test('coverage copy distinguishes count problems, invalid combinations and success',()=>{
-  assert.match(defenseMessage({assignments:[{},{}]},2,3),/select 1 more card/);
-  assert.match(defenseMessage({assignments:[{},{}]},3,3),/replace unused/);
-  assert.match(defenseMessage({assignments:[{}, {},{}]},4,3),/Remove 1 extra card/);
-  assert.match(defenseMessage({assignments:[],reason:'jokers-must-play-alone'},1,3),/Jokers play alone/);
-  assert.match(defenseMessage({assignments:[{}],valid:true},1,1),/ready to play/);
+  assert.match(defenseMessage({assignments:[{},{}]},2,3),/дахиад 1 хөзөр сонгоно уу/);
+  assert.match(defenseMessage({assignments:[{},{}]},3,3),/дарахгүй байгаа хөзрөө солино уу/);
+  assert.match(defenseMessage({assignments:[{}, {},{}]},4,3),/Илүү 1 хөзрийг хасна уу/);
+  assert.match(defenseMessage({assignments:[],reason:'jokers-must-play-alone'},1,3),/Жокерийг дангаар нь тавина/);
+  assert.match(defenseMessage({assignments:[{}],valid:true},1,1),/тавихад бэлэн/);
 });
