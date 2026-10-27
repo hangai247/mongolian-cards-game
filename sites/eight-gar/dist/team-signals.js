@@ -4,6 +4,7 @@ import { availableSetSizes, signalsForPlayer } from './rules/signals.js';
 export function mountTeamSignals({ container, onToggle }) {
   const panel = document.createElement('section');
   panel.className = 'team-signals';
+  panel.id = 'team-signals-panel';
   panel.setAttribute('aria-label', 'Багийн нууц дохио');
   panel.hidden = true;
   const label = document.createElement('p');

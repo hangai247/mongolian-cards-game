@@ -1,10 +1,10 @@
-import { layoutTablePile } from './viewport-table.js';
-import { roomLayout } from './room-layout.js';
+import { layoutTablePile } from './viewport-table.js?v=ger3';
+import { roomLayout } from './room-layout.js?v=ger3.2';
 
 /** A coherent generated room with live public seat labels and card fans. No WebGL is required. */
 export class CharacterRoom {
   constructor(host) {
-    this.host=host; this.snapshot=null; this.animations=[];
+    this.host=host; host.classList.add('ready'); this.snapshot=null; this.animations=[];
     this.reduced=matchMedia('(prefers-reduced-motion: reduce)');
     this.stage=document.createElement('div');this.stage.className='room-scene';
     this.image=new Image();this.image.alt='';this.image.className='room-photo';this.image.decoding='async';
@@ -28,16 +28,22 @@ export class CharacterRoom {
     const center=felt.querySelector('.table-center');
     const pile=felt.querySelector('#highest');
     const count=pile.querySelectorAll('.table-play').length;
-    if(count>1){
-      const top=p.seats[4].y+28;
-      p.play.height=Math.max(p.play.height,Math.min(240,height-top-6));
-      p.play.y=Math.max(top,Math.min(p.play.y,height-p.play.height-6));
-      p.play.height=Math.min(p.play.height,height-p.play.y-6);
+    const hud = felt.querySelector('.turn-hud');
+    const hudTop = hud ? hud.getBoundingClientRect().top - felt.getBoundingClientRect().top : height * .63;
+    if (count <= 1 && !(height < 500 && width > height)) {
+      p.play.y = Math.max(p.seats[4].y + 48, Math.min(p.play.y, hudTop - p.play.height - 12));
+      p.play.height = Math.max(52, Math.min(p.play.height, hudTop - p.play.y - 12));
     }
-    // Short landscape needs the far-seat labels above the pile, not across its layers.
-    if(count>3 && height<280 && innerWidth>innerHeight){
-      for(const seat of p.seats)if(seat.seat>=2&&seat.seat<=6)seat.y=Math.min(seat.y,34);
-      p.play.y=64;p.play.height=Math.max(1,height-70);
+    if (count > 1) {
+      p.play.y = p.seats[4].y + 38;
+      p.play.width = Math.min(width * .70, 650);
+      p.play.x = (width - p.play.width) / 2;
+      p.play.height = Math.max(52, Math.min(200, hudTop - p.play.y - 12));
+      if (height < 500 && width > height) {
+        p.play.y = p.seats[4].y + 22;
+        p.play.width = width * .48; p.play.x = width * .26;
+        p.play.height = Math.max(80, height * .73 - p.play.y - 8);
+      }
     }
     Object.assign(center.style,{left:`${p.play.x}px`,top:`${p.play.y}px`,width:`${p.play.width}px`,height:`${p.play.height}px`});
     this.layoutSeats();

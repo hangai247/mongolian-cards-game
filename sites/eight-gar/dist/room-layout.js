@@ -1,35 +1,32 @@
-// Source-image coordinates keep every public label and card fan attached to its seat.
-// The image is cropped only through room decoration; all seven people stay visible.
+// Artwork and live overlays use the same source coordinates, without image distortion.
 const wide = {
-  image: 'assets/table-room-v2.jpg', width: 1536, height: 1024, cropTop: 180, cropHeight: 820,
-  labels: [[768,955],[205,800],[295,600],[520,530],[768,500],[1015,535],[1240,610],[1350,815]],
-  hands: [null,[190,590],[335,510],[490,460],[755,450],[1050,470],[1280,535],[1410,625]],
-  play: [400,590,736,310],
+  image: 'assets/ger-table-wide-v4.jpg', width: 1672, height: 941,
+  labels: [[155,820],[137,434],[348,337],[580,305],[855,280],[1130,314],[1375,375],[1575,450]],
+  hands: [null,[145,505],[370,396],[580,361],[835,340],[1130,370],[1330,440],[1550,515]],
+  play: [560,440,550,195],
 };
 const tall = {
-  image: 'assets/table-room-mobile-v2.jpg', width: 1024, height: 1536, cropTop: 265, cropHeight: 1150,
-  labels: [[512,1350],[170,970],[245,745],[340,570],[510,550],[680,585],[800,765],[880,1000]],
-  hands: [null,[160,810],[235,615],[335,520],[505,510],[715,535],[850,670],[915,865]],
-  play: [265,770,490,490],
+  image: 'assets/ger-table-portrait-v4.jpg', width: 934, height: 1684,
+  labels: [[467,1000],[110,675],[226,510],[310,430],[467,407],[625,437],[724,531],[823,675]],
+  hands: [null,[102,756],[220,575],[320,495],[470,470],[630,500],[750,602],[842,756]],
+  play: [230,668,474,300],
 };
 export function roomLayout(width, height) {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) throw new RangeError('Invalid room size');
   const source = height / width > .82 ? tall : wide;
-  const scale = Math.min(width / source.width, height / source.cropHeight);
-  const x = (width - source.width * scale) / 2, y = (height - source.cropHeight * scale) / 2;
-  const point = ([px,py]) => ({ x: x + px * scale, y: y + (py - source.cropTop) * scale });
-  const labelWidth = Math.min(112, Math.max(44, source.width * scale * (source === tall ? .14 : .115)));
+  const scale = Math.min(width / source.width, height / source.height);
+  const x = (width - source.width * scale) / 2, y = source === tall ? 0 : (height - source.height * scale) / 2;
+  const point = ([px,py]) => ({x:x+px*scale,y:y+py*scale});
+  const labelWidth = Math.min(source===tall?132:156, Math.max(44, source.width*scale*(source===tall?.18:.105)));
   const [px,py,pw,ph] = source.play;
-  const playPoint = point([px,py]);
-  const playHeight = Math.min(height - 12, Math.max(110, ph * scale));
   return {
-    portrait: source === tall, image: source.image, x, y, width: source.width * scale, height: source.cropHeight * scale,
-    imageTop: -source.cropTop * scale, imageHeight: source.height * scale,
-    play: { ...playPoint, y: Math.min(playPoint.y, height - playHeight - 6), width: pw * scale, height: playHeight },
-    seats: source.labels.map((label,seat) => {
-      const pos=point(label), hand=source.hands[seat] && point(source.hands[seat]);
-      return { ...pos, y: Math.max(24, Math.min(height-24,pos.y)), width: labelWidth, handX: hand?.x ?? pos.x, handY: hand?.y ?? pos.y,
-        fanScale: Math.max(.15, Math.min(.72, scale * .9)), seat };
+    portrait:source===tall,image:source.image,x,y,width:source.width*scale,height:source.height*scale,
+    imageTop:0,imageHeight:source.height*scale,
+    play:{...point([px,py]),x:Math.max(0,point([px,py]).x-(Math.max(110,pw*scale)-pw*scale)/2),width:Math.max(110,pw*scale),height:Math.max(52,ph*scale)},
+    seats:source.labels.map((label,seat)=>{
+      const pos=point(label),hand=source.hands[seat]&&point(source.hands[seat]);
+      return {...pos,x:Math.max(seat===0?64:labelWidth/2,Math.min(width-(seat===0?64:labelWidth/2),pos.x)),y:Math.max(24,Math.min(height-24,pos.y)),width:labelWidth,handX:hand?.x??pos.x,handY:hand?Math.min(height,hand.y+16*scale):pos.y,
+        fanScale:Math.max(.15,Math.min(1,scale*1.12)),seat};
     }),
   };
 }

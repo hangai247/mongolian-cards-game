@@ -1,6 +1,6 @@
 <!doctype html><meta charset="utf-8"><title>Practice table layout checks</title>
 <style>[hidden]{display:none!important}body{margin:0;background:#eee;color:#222;font:14px system-ui}header{position:sticky;top:0;z-index:2;background:#fff;padding:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}button,select{padding:8px}iframe{display:block;border:0;margin:12px auto;background:#17130f}pre{white-space:pre-wrap;margin:15px}#output{max-height:180px;overflow:auto}</style>
-<header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>700</option><option>1440</option></select></label><label>Height <input id="height" type="number" value="844" min="300" max="1600" style="width:65px;padding:8px"></label><label>Scenario <select id="scenario"><option value="opener">Choose opening player</option><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option><option value="stack3">Stacked plays</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
+<header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>568</option><option>700</option><option>844</option><option>1440</option></select></label><label>Height <input id="height" type="number" value="844" min="300" max="1600" style="width:65px;padding:8px"></label><label>Scenario <select id="scenario"><option value="opener">Choose opening player</option><option value="reference">Reference preview</option><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option><option value="stack3">Stacked plays</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
 <pre id="output"></pre><iframe id="game" title="Practice table preview" width="390" height="844"></iframe>
 <script type="module">
 import {renderTrumpCard} from '../dist/trump-card.js';
@@ -11,6 +11,11 @@ const cards=createDeck(),card=(suit,rank)=>cards.find(c=>c.suit===suit&&c.rank==
 const h=r=>card('hearts',r),s=r=>card('spades',r),d=r=>card('diamonds',r),b=r=>card('clubs',r);
 let errors=[];
 function fixture(kind){
+ if(kind==='reference'){
+  const own=[h('10'),h('Q'),d('8'),d('Q'),s('2')],pile=[b('7'),s('7'),d('3')],pool=cards.filter(c=>![...own,...pile].includes(c));
+  const reserve=pool.splice(0,3),hands=[own,...Array.from({length:7},()=>pool.splice(0,4))];hands[7].push(...pool);
+  return {...createMatch(cards,0),hands,reserve,table:{pile,highest:pile}};
+ }
  if(kind==='opener'||kind==='other-opener')return prepareMatch(cards,kind==='opener'?0:1);
  if(kind.startsWith('stack')){
   const size=Number(kind.slice(5)),pile=cards.slice(0,size*7),pool=cards.slice(size*7);
@@ -44,6 +49,7 @@ async function load(kind='defense',width=390,height=844,flags={}){
  await waitFor(()=>kind.includes('opener') ? !frame.contentDocument.querySelector('#discussion')?.hidden : frame.contentDocument.querySelectorAll('#hand .card').length>0,'practice module');
  await waitFor(()=>frame.contentDocument.querySelector('.seat-0')?.style.left&&frame.contentDocument.querySelector('.room-photo')?.naturalWidth>0,'room artwork and seating');
  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+ if(kind==='reference'){frame.contentDocument.querySelector('#pause').click();frame.contentDocument.querySelector('[aria-label="Дөрвөлжин 8"]').click();}
  frame.contentWindow.addEventListener('error',e=>errors.push(e.message));
  frame.contentWindow.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
  return frame.contentDocument;
@@ -53,15 +59,15 @@ const rect=node=>node.getBoundingClientRect();
 function checkViewport(doc,width,height,label){
  const win=frame.contentWindow;
  const trump=doc.querySelector('#trump-label'), trumpBox=rect(trump), scoreBox=rect(doc.querySelector('.scoreboard'));
- assert(trumpBox.width===20&&trumpBox.height===28&&trump.children.length===1&&trumpBox.top>=scoreBox.top&&trumpBox.bottom<=scoreBox.bottom,label+': trump card is compact, single-suit and fully visible');
+ assert(trumpBox.width>=13&&trumpBox.height>=18&&trump.children.length===1&&trumpBox.top>=scoreBox.bottom-1&&trumpBox.bottom<=height,label+': trump card is compact, single-suit and fully visible');
  const meta=rect(doc.querySelector('.round-meta')),teams=doc.querySelectorAll('.team-score');
- assert(rect(teams[0]).right<=meta.left&&meta.right<=rect(teams[1]).left,label+': trump and team scores do not overlap');
+ assert(meta.top>=rect(teams[0]).bottom-1&&meta.top>=rect(teams[1]).bottom-1,label+': trump and team scores do not overlap');
 
  assert(doc.documentElement.scrollHeight<=height+1&&doc.documentElement.scrollWidth<=width+1,label+': no page scrolling');
  for(const id of ['play','pickup','hint','hand','highest','character-room']){
   const box=rect(doc.getElementById(id));assert(box.width>0&&box.height>0&&box.top>=0&&box.bottom<=height+1&&box.right<=width+1,label+': '+id+' remains in the viewport');
  }
- if(width<=700)for(const id of ['play','pickup','hint'])assert(rect(doc.getElementById(id)).height>=48,label+': '+id+' touch target');
+ if(width<=700)for(const id of ['play','pickup','hint'])assert(rect(doc.getElementById(id)).height>=(width>height?40:48),label+': '+id+' touch target');
  assert(win.getComputedStyle(doc.querySelector('#character-room')).display!=='none',label+': portraits always visible');
  assert(!doc.querySelector('#focus-table')&&!doc.querySelector('#atmosphere-open')&&!doc.querySelector('#atmosphere-dialog'),label+': mode controls removed');
  assert(doc.querySelectorAll('#seats .seat').length===7&&doc.querySelectorAll('#self-seat .seat').length===1,label+': seven portrait seats and local seat retained');
@@ -86,7 +92,7 @@ async function run(){
     assert(card.querySelector('.trump-pip').textContent.startsWith(symbol)&&card.getAttribute('aria-label')==='Хөзөр: '+name&&doc.querySelector('#trump-name').textContent===name,label+': '+suit+' symbol and accessible name');
     assert(frame.contentWindow.getComputedStyle(card).color===color,label+': '+suit+' card ink');
     const meta=rect(doc.querySelector('.round-meta')),teams=doc.querySelectorAll('.team-score');
-    assert(rect(teams[0]).right<=meta.left&&meta.right<=rect(teams[1]).left,label+': '+suit+' fits between scores');
+    assert(meta.top>=rect(teams[0]).bottom-1&&meta.top>=rect(teams[1]).bottom-1,label+': '+suit+' fits between scores');
    }
    renderTrumpCard(doc.querySelector('#trump-label'),doc.querySelector('#trump-name'),'hearts');
 

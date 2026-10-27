@@ -30,12 +30,12 @@
 .summary-unit{font-size:10px;color:#baa988}
 .defense-preview{border:1px solid #b5c7a44d;border-radius:10px;padding:12px 14px;background:#142b2399;margin:10px 0 0}
 .defense-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:9px}
-.defense-heading h3{font:18px Georgia,serif;color:#f1dfb7;margin:0}
+.defense-heading h3{font:18px var(--app-font);color:#f1dfb7;margin:0}
 #defense-status{font-size:12px;color:#d1ddc6;margin:0;line-height:1.5}
 #defense-pairs{display:flex;flex-wrap:wrap;gap:8px}
 .defense-pair{display:flex;align-items:center;gap:10px;padding:7px 10px;background:#09281e88;border:1px solid #a9c9ae66;border-radius:6px}
 .defense-pair.uncovered{border-style:dashed;border-color:#d5b58d99}
-.defense-card{display:inline-flex;align-items:center;justify-content:center;background:#f7edda;color:#29251e;padding:5px 8px;border-radius:4px;min-width:40px;font:18px Georgia,serif}
+.defense-card{display:inline-flex;align-items:center;justify-content:center;background:#f7edda;color:#29251e;padding:5px 8px;border-radius:4px;min-width:40px;font:18px var(--app-font)}
 .defense-result{font-size:12px;color:#cae5d0}.uncovered .defense-result{color:#e7ccab}
 #defense-unused{font-size:11px;color:#e8c6a1;margin:9px 0 0;line-height:1.5}
 .practice-table.motion-off *, .practice-table.motion-off *:before,.practice-table.motion-off *:after{animation:none!important;transition:none!important}

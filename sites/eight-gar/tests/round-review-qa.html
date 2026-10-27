@@ -15,7 +15,8 @@ async function load(matchOver,width,height){
  frame.width=width;frame.height=height;
  localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state:fixture(matchOver),byRank:false,signals:[]}));
  const ready=new Promise(resolve=>frame.onload=resolve);frame.src='../dist/practice.html?review='+Date.now();await ready;
- await waitFor(()=>frame.contentDocument.querySelector('#round-dialog')?.open);
+ await waitFor(()=>frame.contentDocument.querySelector('#round-dialog')?.open && frame.contentDocument.querySelector('.seat-0')?.style.left && frame.contentDocument.querySelector('.room-photo')?.naturalWidth > 0);
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
  return frame.contentDocument;
 }
 document.querySelector('#run').onclick=async()=>{

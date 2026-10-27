@@ -1,8 +1,9 @@
+import { controlIcon, setActionButton } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
 import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText, seatName } from './locale-mn.js';
 import { isOpenSeat, teamGroups, switchTeamTarget } from './lobby-teams.js';
 import { mountOpenerSelection } from './opener-selection.js';
-import { layoutTablePile } from './viewport-table.js';
+import { layoutTablePile } from './viewport-table.js?v=ger3';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
 import { RANKS, SUITS, JOKERS, applyAction, canLeadThree, canLeadFive } from './engine.js';
@@ -36,7 +37,7 @@ let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
 const signalControls = createOnlineSignalControls({ container: document.querySelector('.hand-zone'), onError: toast });
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js').then(({ CharacterRoom }) => {
+import('./photographic-room.js?v=ger3.2').then(({ CharacterRoom }) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
@@ -54,6 +55,7 @@ function cardElement(card, interactive = false) {
   const red = card.kind === 'joker' ? card.color === 'red' : ['hearts', 'diamonds'].includes(card.suit);
   element.className = `card${red ? ' red' : ''}${card.kind === 'joker' ? ` joker ${card.color}` : ''}`;
   element.setAttribute('aria-label', cardLabel(card));
+  if (card.kind === 'ordinary') element.dataset.rank = card.rank;
   if (!interactive) element.dataset.publicId = card.id;
   if (interactive) {
     element.type = 'button'; element.dataset.cardId = card.id;
@@ -80,10 +82,12 @@ function sortedHand(sceneArg = scene) {
   return [...sceneArg.hands[0]].sort((a, b) => byRank ? rankIndex(a) - rankIndex(b) || suitIndex(a) - suitIndex(b) : suitIndex(a) - suitIndex(b) || rankIndex(a) - rankIndex(b));
 }
 function renderHand(sceneArg = scene) {
-  const hand = $('hand'); hand.replaceChildren();
+  const hand = $('hand'), scrollLeft = hand.scrollLeft; hand.replaceChildren();
   if (!sceneArg) { for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } $('hand-count').textContent = 'Эхлэхэд 5 хөзөр'; return; }
   const cards = sortedHand(sceneArg);
   hand.classList.toggle('wide-hand', cards.length > 9);
+  hand.style.setProperty('--hand-size', cards.length);
+  hand.dataset.count = cards.length;
   cards.forEach((card, index) => {
     const element = cardElement(card, true);
     const position = index - (cards.length - 1) / 2;
@@ -91,8 +95,11 @@ function renderHand(sceneArg = scene) {
     element.style.setProperty('--lift', `${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * 2}px`);
     hand.append(element);
   });
+  hand.scrollLeft = scrollLeft;
   $('hand-count').textContent = `${sceneArg.hands[0].length} хөзөр`;
-  $('sort').textContent = byRank ? 'Тамгаар эрэмбэлэх ⇅' : 'Чансаагаар эрэмбэлэх ⇅';
+  const sortLabel = byRank ? 'Тамгаар эрэмбэлэх' : 'Чансаагаар эрэмбэлэх';
+  setActionButton($('sort'), sortLabel, 'sort');
+  $('sort').title = sortLabel; $('sort').setAttribute('aria-label', sortLabel);
 }
 function playError() {
   if (!scene || selected.size === 0) return null;
@@ -108,8 +115,11 @@ function renderActions() {
   $('play').disabled = !active || selected.size === 0 || !!error || !!pendingAction;
   $('pickup').disabled = !active || scene.table.pile.length === 0 || !!pendingAction;
   $('hint').disabled = !active;
-  $('play').textContent = selected.size ? `${selected.size} хөзөр тавих ↑` : 'Тавих ↑';
-  $('pickup').textContent = scene?.table.pile.length ? `${scene.table.pile.length} хөзөр авах` : 'Авах';
+  setActionButton($('play'), 'Тавих', 'chevron', true);
+  $('play').setAttribute('aria-label', selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
+  document.body.dataset.selection = String(selected.size);
+  document.body.classList.toggle('my-turn', !!active);
+  setActionButton($('pickup'), scene?.table.pile.length ? `${scene.table.pile.length} хөзөр авах` : 'Авах', 'cards');
   if (animating) $('guidance').textContent = motionText;
   else if (!session) $('guidance').textContent = 'Хөзрөө харахын тулд ширээ нээх эсвэл ширээнд нэгдээрэй.';
   else if (!scene) $('guidance').textContent = 'Тоглогчдыг хүлээж байна. Ширээ нээсэн хүн тоглолт эхлүүлэхэд хөзөр тараана.';
@@ -163,7 +173,7 @@ function render(sceneArg = scene, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}${offline ? ', холболтгүй' : ''}`);
     const mic = micBadge(info, index);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div><span class="seat-name">${escapeHtml(names[index])}${mic}</span><span class="seat-meta"><span class="seat-back" aria-hidden="true"></span> ${shownCount} хөзөр</span></div><span class="player-status">${status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div><span class="seat-name">${escapeHtml(names[index])}${mic}</span><span class="seat-meta">${controlIcon('cards')} ${shownCount}</span></div><span class="player-status">${status}</span>`;
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${names[index]} · ${shownCount} далд хөзөртэй`);
@@ -198,6 +208,7 @@ function render(sceneArg = scene, motion = null) {
   $('turn-label').textContent = !sceneArg ? 'ТАНЫ СУУДАЛ БЭЛЭН' : sceneArg.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : sceneArg.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : sceneArg.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${names[sceneArg.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({ pickup: 'ХӨЗӨР АВЧ БАЙНА', play: 'ХӨЗӨР ТАВЬЖ БАЙНА', refill: 'НӨӨЦӨӨС НӨХӨЖ БАЙНА', sleep: 'УНТАНА' })[motion.type];
   $('reserve-count').textContent = sceneArg?.reserve.length ?? 3;
+  $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = sceneArg?.table.pile.length ?? 0;
   $('pile-open').disabled = animating || !sceneArg?.table.pile.length;
   $('table-message').hidden = connected || !session;
@@ -220,11 +231,12 @@ function renderHeader() {
   const button = $('voice-mic');
   button.hidden = !voiceOn;
   button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
-  const [icon, label] = voiceInfo.state === 'connecting' ? ['…', 'Дуут сувагт холбогдож байна'] : voiceInfo.state === 'error' ? ['🔇', 'Дуут холболт тасарсан']
-    : voiceInfo.micBlocked ? ['🎙', 'Микрофон хаагдсан · дахин оролдох'] : voiceInfo.micOn ? ['🎙', 'Микрофон асаалттай'] : ['🔇', 'Микрофон хаалттай'];
+  const icon = voiceInfo.state === 'connecting' ? 'loading' : voiceInfo.micOn ? 'mic' : 'micOff';
+  const label = voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна' : voiceInfo.state === 'error' ? 'Дуут холболт тасарсан'
+    : voiceInfo.micBlocked ? 'Микрофон хаагдсан · дахин оролдох' : voiceInfo.micOn ? 'Микрофон асаалттай' : 'Микрофон хаалттай';
   const title = voiceInfo.state !== 'on' ? 'Дуут сувагт автоматаар дахин холбогдоно' : voiceInfo.micBlocked ? 'Хөтөчдөө микрофон ашиглахыг зөвшөөрөөд дахин дарна уу'
     : voiceInfo.micOn ? 'Дарж микрофоноо хаана уу' : 'Та бусдыг сонсож байна. Ярихын тулд дарж микрофоноо асаана уу';
-  button.innerHTML = `${icon} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
+  button.innerHTML = `${controlIcon(icon)} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
   button.disabled = voiceInfo.state === 'connecting';
   $('audio-banner').hidden = !voiceOn || !voiceInfo.audioBlocked || voiceInfo.state !== 'on';
 }
@@ -233,7 +245,7 @@ function micBadge(info, display) {
   if (!room?.config?.voice || !info || info.kind !== 'human') return '';
   const member = display === 0 ? (voiceInfo.state === 'on' ? { micOn: voiceInfo.micOn } : null) : voiceMembers.get(info.playerId) ?? null;
   if (!member) return '';
-  return `<span class="seat-mic${member.micOn ? ' live' : ''}" title="${member.micOn ? 'Микрофон асаалттай' : 'Микрофон хаалттай'}" aria-label="${member.micOn ? 'микрофон асаалттай' : 'микрофон хаалттай'}">${member.micOn ? '🎙' : '🔇'}</span>`;
+  return `<span class="seat-mic${member.micOn ? ' live' : ''}" title="${member.micOn ? 'Микрофон асаалттай' : 'Микрофон хаалттай'}" aria-label="${member.micOn ? 'микрофон асаалттай' : 'микрофон хаалттай'}">${controlIcon(member.micOn ? 'mic' : 'micOff')}</span>`;
 }
 async function toggleMic() {
   if (!voice) return;
@@ -257,6 +269,7 @@ function renderTimer() {
   const text = scene.phase === 'choosing-leader' ? `Шийдвэр гаргах: ${clock}` : `${scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`;
   if (text !== lastTimerText) { timer.textContent = text; lastTimerText = text; }
   timer.classList.toggle('urgent', left <= 10 && scene.turn === 0);
+  timer.closest('.turn-hud')?.style.setProperty('--turn-progress', `${Math.min(100, left / 180 * 100)}%`);
 }
 function tick() {
   if (session) { renderTimer(); updateRoundControls(); updateDiscussionCountdown(); }

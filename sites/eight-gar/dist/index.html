@@ -5,16 +5,18 @@
   <meta name="theme-color" content="#17130f">
   <meta name="description" content="Найман хүн хоёр баг болж тоглодог монгол хөзрийн 8 гар тоглоомд нэгдээрэй. Ширээ нээж, долоон найзаа уриад хамтдаа ярилцан тоглоорой.">
   <title>8 гар · Монгол хөзрийн тоглоом</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23143f35'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Georgia' font-size='48' fill='%23f5ead1'%3E8%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23143f35'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Tahoma' font-size='48' fill='%23f5ead1'%3E8%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="viewport-table.css">
   <link rel="stylesheet" href="realistic-table.css">
   <link rel="stylesheet" href="trump-card.css">
   <link rel="stylesheet" href="table-pile.css">
   <link rel="stylesheet" href="round-review.css">
-  <script type="module" src="/app.js"></script>
+  <link rel="stylesheet" href="ger-table.css?v=controls4">
+  <script type="module" src="ger-table.js?v=controls4"></script>
+  <script type="module" src="/app.js?v=controls4"></script>
 </head>
-<body class="real-table viewport-table">
+<body class="ger-table real-table viewport-table">
   <header class="header"><a href="/" class="brand" aria-label="8 гар нүүр хуудас"><span class="brand-mark">8</span><span>8 гар <small>МОНГОЛ ХӨЗРИЙН ТОГЛООМ</small></span></a><div class="room-heading"><span class="room-spark">✦</span> Найзуудтайгаа нэг ширээнд <span class="room-spark">✦</span></div><div class="header-right"><span class="room-badge" id="room-badge" hidden>Ширээ <b id="room-code"></b><button class="text-button" id="copy-link">Холбоос хуулах</button></span><span class="conn-status" id="conn-status" hidden>Дахин холбогдож байна…</span><button class="text-button" id="rules-open">Дүрэм</button><button class="quiet-button" id="new-match" aria-label="Ширээнээс гарах" hidden>↩ <span>Гарах</span></button></div></header>
   <main>
     <div class="game-layout">

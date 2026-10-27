@@ -22,7 +22,7 @@ test('real room maps all eight seats and the play area inside phone and desktop 
 test('the photo has one scale in both directions and changes composition for tall screens',()=>{
   const wide=roomLayout(1440,472),portrait=roomLayout(390,446);
   assert(!wide.portrait);assert(portrait.portrait);
-  assert.equal(wide.width/wide.imageHeight,1536/1024);
-  assert.equal(portrait.width/portrait.imageHeight,1024/1536);
+  assert.equal(wide.width/wide.imageHeight,1672/941);
+  assert.equal(portrait.width/portrait.imageHeight,934/1684);
   assert.throws(()=>roomLayout(0,100),RangeError);
 });

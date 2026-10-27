@@ -1,7 +1,8 @@
+import { controlIcon, setActionButton } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
 import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText } from './locale-mn.js';
 import { mountOpenerSelection } from './opener-selection.js';
-import { layoutTablePile } from './viewport-table.js';
+import { layoutTablePile } from './viewport-table.js?v=ger3';
 import { advanceSignals, reconcileSignals, setSignal } from './rules/signals.js';
 import { mountTeamSignals } from './team-signals.js';
 import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader, canLeadThree, canLeadFive } from './rules/engine.js';
@@ -22,7 +23,10 @@ let state = null, selected = new Set(), liveMove = '', paused = false, byRank = 
 let signals = [];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const atmosphere = new TableAtmosphere();
-atmosphere.configure({ sound: true, volume: .25 });
+let soundEnabled = true;
+try { soundEnabled = localStorage.getItem('eight-gar-sound') !== 'off'; } catch {}
+atmosphere.configure({ sound: soundEnabled, volume: .25 });
+document.addEventListener('table-sound-change', event => atmosphere.configure({ sound: event.detail, volume: .25 }));
 const motionEnabled = () => !reducedMotion.matches;
 function stopEffects() { atmosphere.stop(); characterRoom.clearReaction?.(); }
 function changePresentation() {
@@ -44,7 +48,7 @@ function renderSignals() {
 let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0, motionText = '';
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js').then(({CharacterRoom}) => {
+import('./photographic-room.js?v=ger3.2').then(({CharacterRoom}) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
@@ -57,6 +61,7 @@ function cardElement(card, interactive = false) {
   const red = card.kind === 'joker' ? card.color === 'red' : ['hearts', 'diamonds'].includes(card.suit);
   element.className = `card${red ? ' red' : ''}${card.kind === 'joker' ? ` joker ${card.color}` : ''}`;
   element.setAttribute('aria-label', cardLabel(card));
+  if (card.kind === 'ordinary') element.dataset.rank = card.rank;
   if (!interactive) element.dataset.publicId = card.id;
   if (interactive) {
     element.type = 'button'; element.dataset.cardId = card.id;
@@ -104,6 +109,8 @@ function renderHand(scene = state) {
   if (!scene) { for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } return; }
   const cards = sortedHand(scene);
   hand.classList.toggle('wide-hand', cards.length > 9);
+  hand.style.setProperty('--hand-size', cards.length);
+  hand.dataset.count = cards.length;
   cards.forEach((card, index) => {
     const element = cardElement(card, true);
     const position = index - (cards.length - 1) / 2;
@@ -113,7 +120,9 @@ function renderHand(scene = state) {
   });
   hand.scrollLeft = scrollLeft;
   $('hand-count').textContent = `${scene.hands[0].length} хөзөр`;
-  $('sort').textContent = byRank ? 'Тамгаар эрэмбэлэх ⇅' : 'Чансаагаар эрэмбэлэх ⇅';
+  const sortLabel = byRank ? 'Тамгаар эрэмбэлэх' : 'Чансаагаар эрэмбэлэх';
+  setActionButton($('sort'), sortLabel, 'sort');
+  $('sort').title = sortLabel; $('sort').setAttribute('aria-label', sortLabel);
 }
 function playError() {
   if (!state || selected.size === 0) return null;
@@ -129,8 +138,11 @@ function renderActions() {
   $('pickup').disabled = !active || state.table.pile.length === 0;
   $('hint').disabled = !active;
   const defenseGuidance = renderDefense({ active, hand: state?.hands[0] ?? [], selected, targets: state?.table.highest, trump: state?.trump });
-  $('play').textContent = selected.size ? `${selected.size} хөзөр тавих ↑` : 'Тавих ↑';
-  $('pickup').textContent = state?.table.pile.length ? `${state.table.pile.length} хөзөр авах` : 'Авах';
+  setActionButton($('play'), 'Тавих', 'chevron', true);
+  $('play').setAttribute('aria-label', selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
+  document.body.dataset.selection = String(selected.size);
+  document.body.classList.toggle('my-turn', !!active);
+  setActionButton($('pickup'), state?.table.pile.length ? `${state.table.pile.length} хөзөр авах` : 'Авах', 'cards');
   $('pause').hidden = !state || state.phase !== 'playing';
   $('pause').textContent = paused ? 'Үргэлжлүүлэх' : 'Түр зогсоох';
   if (animating) $('guidance').textContent = motionText;
@@ -170,7 +182,7 @@ function render(scene = state, motion = null) {
     seat.className = `seat seat-${index} ${index % 2 ? 'theirs' : 'ours'}${active ? ' active' : ''}${winning ? ' celebrating' : ''}`;
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${NAMES[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}`);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div><span class="seat-name">${NAMES[index]}</span><span class="seat-meta"><span class="seat-back" aria-hidden="true"></span> ${shownCount} хөзөр</span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div><span class="seat-name">${NAMES[index]}</span><span class="seat-meta">${controlIcon('cards')} ${shownCount}</span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${NAMES[index]} · ${shownCount} далд хөзөртэй`);
@@ -206,6 +218,7 @@ function render(scene = state, motion = null) {
   $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'ТОГЛОЛТ ТҮР ЗОГССОН' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({pickup:'ХӨЗӨР АВЧ БАЙНА',play:'ХӨЗӨР ТАВЬЖ БАЙНА',refill:'НӨӨЦӨӨС НӨХӨЖ БАЙНА',sleep:'УНТАНА'})[motion.type];
   $('reserve-count').textContent = scene?.reserve.length ?? 3;
+  $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = scene?.table.pile.length ?? 0;
   $('pile-open').disabled = animating || !scene?.table.pile.length;
   $('table-message').hidden = !paused || !scene || scene.phase !== 'playing';
