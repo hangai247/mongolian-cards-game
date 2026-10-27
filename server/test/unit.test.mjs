@@ -28,7 +28,10 @@ test('room codes use the confusion-free alphabet and normalise read-aloud mistak
     assert.ok(isValidCode(code));
   }
   assert.equal(normalizeCode('ab-cd ef'), 'ABCDEF');
-  assert.equal(normalizeCode('o0il1'), '00111');
+  assert.equal(normalizeCode('5q7kl2'), '5Q7KL2', 'L is a real alphabet letter and must survive normalisation');
+  assert.equal(isValidCode(normalizeCode('5q7kl2')), true);
+  for (let i = 0; i < 200; i++) { const code = generateCode(); assert.equal(normalizeCode(code.toLowerCase()), code); assert.ok(isValidCode(code)); }
+  assert.equal(isValidCode(normalizeCode('o0il1a')), false, 'confusable glyphs outside the alphabet are rejected, not rewritten');
   assert.equal(RoomCodeInput.parse(' abc-234 '), 'ABC234');
   assert.ok(!RoomCodeInput.safeParse('ABC').success);
   assert.ok(!RoomCodeInput.safeParse('ABCDEF0').success);

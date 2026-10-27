@@ -11,9 +11,10 @@ export function generateCode(random: (max: number) => number = max => randomInt(
   return code;
 }
 
-/** Uppercases, strips separators and maps the confusable glyphs the alphabet excludes. Does not validate. */
+/** Uppercases and strips separators. Does not validate, and never rewrites letters: L is part of the alphabet,
+ *  while 0/O/1/I are not, so a typed confusable is simply rejected by the pattern. */
 export function normalizeCode(input: string): string {
-  return input.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 export function isValidCode(code: string): boolean {
