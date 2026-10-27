@@ -16,7 +16,8 @@ const openerSelection = mountOpenerSelection({ container: $('opening-players'), 
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const STORAGE = 'naiman-gar-practice-v1';
-const COMPUTER_TURN_DELAY_MS = 2500;
+// Pause after the previous play finishes animating, so a human can read the table before the next computer move.
+const COMPUTER_TURN_DELAY_MS = 5000;
 let state = null, selected = new Set(), liveMove = '', paused = false, byRank = false, timer = null, toastTimer = null;
 let signals = [];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');

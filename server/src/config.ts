@@ -19,7 +19,7 @@ const Env = z.object({
   LEADER_SECONDS: z.coerce.number().positive().default(180),
   ROUND_REVIEW_SECONDS: z.coerce.number().nonnegative().default(10),
   ROUND_OVER_SECONDS: z.coerce.number().positive().default(60),
-  BOT_DELAY_MS: z.coerce.number().nonnegative().default(1500),
+  BOT_DELAY_MS: z.coerce.number().nonnegative().default(4000),
   BOT_TAKEOVER_SECONDS: z.coerce.number().positive().default(180),
   STATIC_DIR: z.string().min(1).default(path.resolve(here, '../../sites/eight-gar/dist')),
   ENGINE_DIST_DIR: z.string().min(1).default(path.resolve(here, '../../dist')),
