@@ -12,6 +12,7 @@ const paths = {
  sort: '<path d="M7 3v18M3 7l4-4 4 4M17 21V3m-4 14 4 4 4-4"/>',
  cards: '<rect x="3" y="4" width="13" height="17" rx="2" transform="rotate(-12 9.5 12.5)" fill="#65717e"/><rect x="7" y="3" width="13" height="18" rx="2" transform="rotate(12 13.5 12)" fill="#8a95a1"/>',
  chevron: '<path d="m9 4 8 8-8 8" stroke-width="3.2"/>',
+ clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 .5c0 2-2.5 2-2.5 4m0 3h.01"/>',
  invite: '<circle cx="9" cy="7" r="3"/><path d="M2 21v-2a7 7 0 0 1 14 0v2Zm17-15v8m-4-4h8"/>',
 };

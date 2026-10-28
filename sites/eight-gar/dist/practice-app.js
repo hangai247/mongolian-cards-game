@@ -5,7 +5,7 @@ import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
 import { advanceSignals, reconcileSignals, setSignal } from './rules/signals.js';
 import { mountTeamSignals } from './team-signals.js';
-import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader, canLeadThree, canLeadFive } from './rules/engine.js';
+import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader } from './rules/engine.js';
 import { findPlay, chooseComputerLeader } from './rules/strategy.js';
 import { readSavedMatch } from './practice-save.js';
 import { transitionSteps, fanLayout } from './presentation.js';
@@ -49,7 +49,7 @@ const signalControls = mountTeamSignals({ container: document.querySelector('.ha
 function renderSignals() {
   signalControls.render({ seat: 0, phase: state?.phase, hand: state?.hands[0], signals });
 }
-let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0, motionText = '';
+let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0;
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
 import('./photographic-room.js?v=avatars1').then(({CharacterRoom}) => {
@@ -151,18 +151,16 @@ function renderActions() {
   setActionButton($('pickup'), state?.table.pile.length ? `${state.table.pile.length} хөзөр авах` : 'Авах', 'cards');
   $('pause').hidden = !state || state.phase !== 'playing';
   $('pause').textContent = paused ? 'Үргэлжлүүлэх' : 'Түр зогсоох';
-  if (animating) $('guidance').textContent = motionText;
+  if (animating) $('guidance').textContent = '';
   else if (!state) $('guidance').textContent = 'Хөзрөө харахын тулд тоглолтоо эхлүүлээрэй.';
   else if (state.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (state.phase !== 'playing') $('guidance').textContent = state.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
   else if (paused) $('guidance').textContent = 'Бэлэн болмогц үргэлжлүүлээрэй.';
-  else if (state.turn !== 0) $('guidance').textContent = `${NAMES[state.turn]} нүүдлээ сонгож байна…`;
+  // During play the capsule only explains an illegal selection or the opt-in defence coaching; the seat highlight and buttons say the rest.
+  else if (state.turn !== 0) $('guidance').textContent = '';
   else if (error) $('guidance').textContent = defenseGuidance || ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.';
-  else if (selected.size) $('guidance').textContent = defenseGuidance || 'Энэ нүүдэл зөв. Бэлэн бол тавиарай.';
-  else if (state.table.highest.length) $('guidance').textContent = `${state.table.highest.length} хөзрийг дарах эсвэл ширээний бүх хөзрийг аваарай.`;
-  else $('guidance').textContent = canLeadThree(state)
-    ? `Та эхэлнэ. Нэг эсвэл гурван хөзөр${canLeadFive(state) ? ', эсвэл хоёр хостой таван хөзөр' : ''} сонгоорой.`
-    : 'Нэг хөзрөөр эхэлнэ. Гурваас цөөн хөзөртэй тоглогч байна.';
+  else $('guidance').textContent = defenseGuidance || '';
+  $('guidance').hidden = !$('guidance').textContent;
 }
 function render(scene = state, motion = null) {
   document.body.classList.toggle('has-match', !!scene);
@@ -269,7 +267,6 @@ async function commit(move) {
     renderActions();
     for (const step of transitionSteps(previous, events)) {
       if (motionController.signal.aborted || token !== motionEpoch) break;
-      motionText = step.type === 'pickup' ? `${NAMES[actor]} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${NAMES[actor]} · ${step.cards.length} хөзөр тавьж байна…`;
       atmosphere.cue(step.type, `${token}:${step.type}`);
       if (step.type === 'pickup' && step.cards.length >= 8) characterRoom.react?.({ type: 'surprise', player: actor });
       await animateStep(step, { render, cardElement, signal: motionController.signal, motionEnabled: motionEnabled() });
@@ -280,7 +277,7 @@ async function commit(move) {
     console.error(error);
   } finally {
     if (token === motionEpoch) {
-      animating = false; motionController = null; motionText = ''; render();
+      animating = false; motionController = null; render();
       if (state && ['round-over','match-over'].includes(state.phase)) {
         if (completedPresentation && !paused && !document.hidden) {
           atmosphere.cue('win', `${token}:win`);

@@ -7,7 +7,7 @@ import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
-import { RANKS, SUITS, JOKERS, applyAction, canLeadThree, canLeadFive } from './engine.js';
+import { RANKS, SUITS, JOKERS, applyAction } from './engine.js';
 import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
@@ -34,7 +34,7 @@ const ENGINE_EVENTS = new Set(['played', 'picked-up', 'refilled', 'table-slept']
 let session = null, client = null, room = null, latestView = null, me = 0, names = defaultNames(), connected = false;
 // Rendered scene (display coordinates) and animation state
 let scene = null, selected = new Set(), liveMove = '', byRank = false, toastTimer = null;
-let animating = false, motionController = null, motionEpoch = 0, motionText = '', rosterDirty = false;
+let animating = false, motionController = null, motionEpoch = 0, rosterDirty = false;
 let pendingUpdates = [], processing = false;
 // Timers from the server (epoch ms on the server clock)
 let deadline = null, deadlineSpan = null, timerKind = null, reviewUntil = null;
@@ -130,19 +130,15 @@ function renderActions() {
   document.body.dataset.selection = String(selected.size);
   document.body.classList.toggle('my-turn', !!active);
   setActionButton($('pickup'), scene?.table.pile.length ? `${scene.table.pile.length} хөзөр авах` : 'Авах', 'cards');
-  if (animating) $('guidance').textContent = motionText;
+  if (animating) $('guidance').textContent = '';
   else if (!session) $('guidance').textContent = 'Хөзрөө харахын тулд ширээ нээх эсвэл ширээнд нэгдээрэй.';
   else if (!scene) $('guidance').textContent = 'Тоглогчдыг хүлээж байна. Ширээ нээсэн хүн тоглолт эхлүүлэхэд хөзөр тараана.';
   else if (!connected) $('guidance').textContent = 'Ширээнд дахин холбогдож байна…';
   else if (scene.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (scene.phase !== 'playing') $('guidance').textContent = scene.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
-  else if (scene.turn !== 0) $('guidance').textContent = `${names[scene.turn]} нүүдлээ сонгож байна…`;
-  else if (error) $('guidance').textContent = ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.';
-  else if (selected.size) $('guidance').textContent = 'Энэ нүүдэл зөв. Бэлэн бол тавиарай.';
-  else if (scene.table.highest.length) $('guidance').textContent = `${scene.table.highest.length} хөзрийг дарах эсвэл ширээний бүх хөзрийг аваарай.`;
-  else $('guidance').textContent = canLeadThree(scene)
-    ? `Та эхэлнэ. Нэг эсвэл гурван хөзөр${canLeadFive(scene) ? ', эсвэл хоёр хостой таван хөзөр' : ''} сонгоорой.`
-    : 'Нэг хөзрөөр эхэлнэ. Гурваас цөөн хөзөртэй тоглогч байна.';
+  // During play the capsule only explains an illegal selection; the seat highlight, clock and buttons say the rest.
+  else $('guidance').textContent = scene.turn === 0 && error ? ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.' : '';
+  $('guidance').hidden = !$('guidance').textContent;
   renderComputerMessage($('guidance'), $('guidance').textContent);
 }
 function seatStatus(sceneArg, index, motion, count, active, winning) {
@@ -285,8 +281,10 @@ function renderTimer() {
   if (!show) { lastTimerText = ''; return; }
   const left = Math.max(0, Math.ceil((deadline - serverNow()) / 1000));
   const clock = left >= 60 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : `${left} сек`;
-  const text = scene.phase === 'choosing-leader' ? `Шийдвэр гаргах: ${clock}` : `${scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`;
-  if (text !== lastTimerText) { timer.textContent = text; lastTimerText = text; }
+  if (clock !== lastTimerText) {
+    timer.innerHTML = `${controlIcon('clock')}<span>${clock}</span>`; lastTimerText = clock;
+    timer.setAttribute('aria-label', `${scene.phase === 'choosing-leader' ? 'Шийдвэр гаргах' : scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`);
+  }
   timer.classList.toggle('urgent', left <= 10 && scene.turn === 0);
   const progress = `${Math.min(100, Math.max(0, deadline - serverNow()) / deadlineSpan * 100)}%`;
   timer.closest('.turn-hud')?.style.setProperty('--turn-progress', progress);
@@ -553,12 +551,10 @@ async function processQueue() {
         try {
           for (const step of transitionSteps(start, engineEvents)) {
             if (motionController.signal.aborted || token !== motionEpoch) break;
-            const actor = names[step.player];
-            motionText = step.type === 'pickup' ? `${actor} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${actor} · ${step.cards.length} хөзөр тавьж байна…`;
             await animateStep(step, { render, cardElement, signal: motionController.signal });
           }
         } catch (error) { console.error(error); }
-        finally { if (token === motionEpoch) { animating = false; motionController = null; motionText = ''; } }
+        finally { if (token === motionEpoch) { animating = false; motionController = null; } }
       }
       if (rosterDirty) { rosterDirty = false; updateNames(); }
       render();
