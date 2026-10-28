@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="mn">
 <head>
-  <meta charset="utf-8"><base href="/"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#17130f">
+  <meta charset="utf-8"><base href="/"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#09251f">
   <meta name="description" content="Найман хүн хоёр баг болж тоглодог монгол хөзрийн 8 гар тоглоомд нэгдээрэй. Ширээ нээж, долоон найзаа уриад хамтдаа ярилцан тоглоорой.">
   <title>8 гар · Монгол хөзрийн тоглоом</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23143f35'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Tahoma' font-size='48' fill='%23f5ead1'%3E8%3C/text%3E%3C/svg%3E">
@@ -13,10 +13,15 @@
   <link rel="stylesheet" href="table-pile.css">
   <link rel="stylesheet" href="round-review.css">
   <link rel="stylesheet" href="ger-table.css?v=seaticons9">
-  <script type="module" src="ger-table.js?v=seaticons9"></script>
-  <script type="module" src="/app.js?v=seaticons9"></script>
+  <link rel="stylesheet" href="card-depth.css">
+  <script type="module" src="ger-table.js?v=single-invite1"></script>
+  <link rel="stylesheet" href="lobby-entry.css?v=lobby1">
+  <link rel="stylesheet" href="lobby-room.css?v=room1">
+  <script type="module" src="/app.js?v=room1"></script>
+  <link rel="stylesheet" href="avatars.css?v=avatars1">
 </head>
-<body class="ger-table real-table viewport-table">
+<body class="ger-table real-table viewport-table lobby-home">
+  <picture class="lobby-backdrop" aria-hidden="true"><source media="(max-width: 700px)" srcset="assets/ger-room-portrait-v5.jpg"><img src="assets/ger-room-wide-v5.jpg" alt="" fetchpriority="high"></picture>
   <header class="header"><a href="/" class="brand" aria-label="8 гар нүүр хуудас"><span class="brand-mark">8</span><span>8 гар <small>МОНГОЛ ХӨЗРИЙН ТОГЛООМ</small></span></a><div class="room-heading"><span class="room-spark">✦</span> Найзуудтайгаа нэг ширээнд <span class="room-spark">✦</span></div><div class="header-right"><span class="room-badge" id="room-badge" hidden>Ширээ <b id="room-code"></b><button class="text-button" id="copy-link">Холбоос хуулах</button></span><span class="conn-status" id="conn-status" hidden>Дахин холбогдож байна…</span><button class="text-button" id="rules-open">Дүрэм</button><button class="quiet-button" id="new-match" aria-label="Ширээнээс гарах" hidden>↩ <span>Гарах</span></button></div></header>
   <main>
     <div class="game-layout">
@@ -29,25 +34,54 @@
           <div id="seats" class="seats"></div><div id="self-seat"></div></div>
           <div class="table-center"><div class="table-heading"><p class="turn-label" id="turn-label">ТАНЫ СУУДАЛ БЭЛЭН</p><p class="turn-timer" id="turn-timer" role="timer" aria-live="off" hidden></p><p class="live-move" id="live-move" role="status" aria-live="polite" hidden></p></div><section class="discussion" id="discussion" hidden aria-label="Хөзөр тараасны дараа эхлэх тоглогчийг сонгох"><h2 id="discussion-title"></h2><p id="discussion-copy"></p><div id="human-discussion"><div id="opening-players" class="opener-cards" role="radiogroup" aria-label="Эхлэх тоглогчоо сонгох"></div><button class="button light" id="confirm-opener" disabled>Багийн шийдвэрийг батлах →</button></div><div id="computer-discussion" hidden><p class="waiting-copy" id="waiting-copy">Эсрэг баг эхлэх тоглогчоо сонгохыг хүлээж байна…</p></div><small id="discussion-note">Таны хөзөр бусдад харагдахгүй. Нийтийн дуут сувгаар багтайгаа ярилцаарай.</small></section><p id="pile-key" class="pile-key" hidden>ШИРЭЭН ДЭЭР <span>· дарах хөзрийг алтан хүрээгээр тэмдэглэв</span></p><div id="highest" class="highest" role="list" aria-label="Ширээн дээрх бүх хөзөр, тавьсан дарааллаар"></div><div class="table-stats" id="table-stats" hidden><span><span class="tiny-deck" aria-hidden="true"></span> Нөөц <b id="reserve-count">3</b></span><button id="pile-open" aria-label="Ширээн дээрх бүх хөзрийг томруулж харах">Ширээн дээр <b id="pile-count">0</b> <span aria-hidden="true">↗</span></button></div></div>
           <div class="welcome lobby" id="welcome">
-            <div id="lobby-entry">
-              <div class="welcome-suits" aria-hidden="true">✦</div><span class="eyebrow">МАНАЙ ШИРЭЭНД ТАВТАЙ МОРИЛ</span><h2>Сайхан нөхөд.<br>Сонирхолтой тоглоом.</h2>
-              <p id="lobby-intro">Найман суудал. Хоёр баг. Нэг дуут суваг. Ширээ нээж долоон найздаа холбоосыг илгээгээрэй. Эсвэл сул суудлыг компьютер тоглогчоор дүүргэж болно.</p>
-              <label class="lobby-label" for="lobby-name">Тоглоомд харагдах нэр</label>
-              <input id="lobby-name" class="lobby-input" maxlength="20" autocomplete="nickname" placeholder="Жишээ нь: Бат">
-              <div class="lobby-actions"><button class="button light" id="create">Шинэ ширээ нээх <span aria-hidden="true">→</span></button></div>
-              <div class="lobby-join"><label class="lobby-label" for="lobby-code" id="lobby-code-caption">Эсвэл ширээний кодоор нэгдэх</label><div class="lobby-row"><input id="lobby-code" class="lobby-input code" maxlength="8" placeholder="ABC234" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="quiet-button" id="join">Нэгдэх</button></div></div>
-              <a class="text-button" href="/practice.html">Компьютертой дадлага хийх →</a><small id="lobby-error" class="lobby-error" role="alert"></small>
-            </div>
-            <div id="lobby-room" hidden>
-              <span class="eyebrow">ШИРЭЭ <b id="lobby-code-label"></b></span><h2 id="lobby-title">Тоглогчид цуглаж байна</h2>
-              <p id="lobby-copy">Найзууддаа холбоосыг илгээж суудалд урь. Багийг суудал тогтооно: сондгой суудлууд нэг баг, тэгш суудлууд нөгөө баг. Сул суудал дээр дарж шилжинэ, эсвэл «Энэ багт шилжих» товчоор багаа солино.</p>
-              <div class="share-row"><input id="share-link" class="lobby-input" readonly aria-label="Ширээний холбоос"><button class="quiet-button" id="share-copy">Хуулах</button></div>
-              <div class="lobby-voice" id="lobby-voice" hidden><button class="quiet-button voice-button muted" id="lobby-mic" type="button" aria-pressed="false"></button><small id="lobby-voice-note"></small></div>
-              <div class="team-groups" id="seat-list" aria-label="Багууд ба суудлууд"></div>
-              <div class="lobby-actions host-actions" id="host-actions" hidden><button class="quiet-button" id="fill-bots">Компьютероор дүүргэх</button><button class="button light" id="start-game" disabled>Хөзөр тараах <span aria-hidden="true">→</span></button></div>
-              <small id="lobby-status"></small>
-              <button class="text-button" id="lobby-leave">Ширээнээс гарах</button>
-            </div>
+            <section id="lobby-entry" aria-labelledby="lobby-heading">
+              <div class="lobby-story">
+                <span class="eyebrow">ТАВТАЙ МОРИЛ</span>
+                <h2 id="lobby-heading">Сайхан нөхөд.<br>Сонирхолтой тоглоом.</h2>
+                <p id="lobby-intro">Найман суудал. Хоёр баг. Нэг ширээ.</p>
+                <div id="entry-avatar-preview"></div>
+                <div class="lobby-card-fan" aria-hidden="true">
+                  <span class="lobby-art-card"><b>A<small>♠</small></b><em>♠</em></span>
+                  <span class="lobby-art-card heart"><b>K<small>♥</small></b><i></i></span>
+                  <span class="lobby-art-card"><b>Q<small>♣</small></b><i></i></span>
+                </div>
+              </div>
+              <div class="lobby-form" role="group" aria-label="Ширээ нээх эсвэл нэгдэх">
+                <label class="lobby-label" for="lobby-name">Таны нэр</label>
+                <input id="lobby-name" class="lobby-input" maxlength="20" autocomplete="nickname" enterkeyhint="go" placeholder="Жишээ нь: Бат" aria-describedby="lobby-error">
+                <div id="entry-avatar-picker"></div>
+                <div class="lobby-actions"><button class="button light" id="create" type="button">Шинэ ширээ нээх <span aria-hidden="true">→</span></button></div>
+                <div class="lobby-join"><label class="lobby-label" for="lobby-code" id="lobby-code-caption">эсвэл кодоор нэгдэх</label><div class="lobby-row"><input id="lobby-code" class="lobby-input code" maxlength="6" placeholder="ABC234" inputmode="text" enterkeyhint="go" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-describedby="lobby-error"><button class="quiet-button" id="join" type="button">Нэгдэх</button></div></div>
+                <a class="lobby-practice" href="/practice.html"><svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="14" height="19" rx="2" transform="rotate(-12 10 14)"/><rect x="12" y="4" width="13" height="19" rx="2" transform="rotate(12 18 14)"/><path d="m19 9 3 5-3 5-3-5Z"/></svg><span>Компьютертэй дадлага хийх</span><span aria-hidden="true">→</span></a>
+                <small id="lobby-error" class="lobby-error" role="alert"></small>
+              </div>
+            </section>
+            <section id="lobby-room" hidden aria-labelledby="lobby-title">
+              <div class="room-intro">
+                <span class="eyebrow">НАЙЗУУДЫН ШИРЭЭ</span>
+                <h2 id="lobby-title">Найзуудаа хүлээж байна</h2>
+                <p id="lobby-copy">Найзуудаа урьж, багаа сонгоорой.</p>
+                <div class="room-invite">
+                  <span class="lobby-label">Ширээний код</span>
+                  <b id="lobby-code-label"></b>
+                  <label class="lobby-label" for="share-link">Урих холбоос</label>
+                  <div class="share-row"><input id="share-link" class="lobby-input" readonly inputmode="none" aria-label="Ширээний холбоос"><button class="quiet-button" id="share-copy" type="button">Хуулах</button></div>
+                </div>
+                <div id="lobby-avatar-picker"></div>
+                <div class="lobby-voice" id="lobby-voice" hidden><button class="quiet-button voice-button muted" id="lobby-mic" type="button" aria-pressed="false"></button><small id="lobby-voice-note"></small></div>
+              </div>
+              <div class="room-roster">
+                <div class="roster-heading"><h3>Багууд ба суудлууд</h3><span class="room-occupancy"><b id="room-filled">1</b> / 8 суудал</span></div>
+                <div class="room-progress" aria-hidden="true"><span id="room-progress-fill"></span></div>
+                <p class="room-seat-hint">Сул суудал дээр дарж суудлаа солино.</p>
+                <div class="team-groups" id="seat-list" aria-label="Багууд ба суудлууд"></div>
+              </div>
+              <div class="room-footer">
+                <small id="lobby-status" role="status" aria-live="polite"></small>
+                <div class="lobby-actions host-actions" id="host-actions" hidden><button class="quiet-button" id="fill-bots" type="button">Компьютероор дүүргэх</button><button class="button light" id="start-game" type="button" aria-describedby="lobby-status" disabled>Хөзөр тараах <span aria-hidden="true">→</span></button></div>
+                <button class="text-button" id="lobby-leave" type="button">Ширээнээс гарах</button>
+              </div>
+            </section>
           </div>
           <div class="table-message" id="table-message" hidden></div>
         </div>

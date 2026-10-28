@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { io } from 'socket.io-client';
+import { createApp } from '../dist/app.js';
+import { loadConfig } from '../dist/config.js';
+import { createRoom, applyCommand } from '../dist/room/reducer.js';
+import { seatInfos, roomStateFor } from '../dist/room/views.js';
+import { CreateRoomBody, JoinRoomBody, C2S } from '../dist/protocol.js';
+import { AVATAR_IDS } from '../../dist/avatars.js';
+import { MemoryRepository } from '../dist/db/repo.js';
+const timing = { turnMs: 60000, leaderMs: 60000, roundReviewMs: 0, roundOverMs: 60000, botDelayMs: 60000, botTakeoverMs: 1000 };
+const ctx = { now: Date.now(), random: () => .37, timing };
+const makeRoom = () => createRoom({ id: 'test-room', code: 'ABC234', hostPlayerId: 'p0', hostName: 'Host', avatarId: 'oyu', now: ctx.now });
+const move = (room, command) => applyCommand(room, command, ctx).snapshot;
+test('avatar schema accepts seven presets and defaults old clients; refuses arbitrary IDs, URLs and spoofed owners', () => {
+  for (const avatarId of AVATAR_IDS) assert(CreateRoomBody.safeParse({ name: 'A', avatarId }).success);
+  assert.equal(JoinRoomBody.parse({ name: 'Old' }).avatarId, 'temu');
+  for (const avatarId of ['../../file', 'https://example.com/a.png', '', null, 123]) assert(!CreateRoomBody.safeParse({ name: 'A', avatarId }).success);
+  assert(!C2S['room:setAvatar'].safeParse({ avatarId: 'anu', playerId: 'p0' }).success);
+});
+test('identity follows seats, permits duplicates, survives bot replacement and reconnect, and stays locked during games', () => {
+  let room = move(makeRoom(), { type: 'join', playerId: 'p1', name: 'Guest', avatarId: 'oyu' });
+  assert.equal(seatInfos(room)[0].avatarId, seatInfos(room)[1].avatarId);
+  room = move(room, { type: 'set-avatar', playerId: 'p1', avatarId: 'anu' });
+  room = move(room, { type: 'move', playerId: 'p1', seat: 5 });
+  assert.equal(seatInfos(room)[5].avatarId, 'anu'); assert.equal(seatInfos(room)[1].avatarId, null);
+  for (const playerId of ['p0', 'p1']) assert.equal(roomStateFor(room, playerId, ctx.now, timing, false).seats[5].avatarId, 'anu');
+  assert.throws(() => move(room, { type: 'set-avatar', playerId: 'stranger', avatarId: 'anu' }), e => e.code === 'UNAUTHORIZED');
+  assert.throws(() => move(room, { type: 'set-avatar', playerId: 'p1', avatarId: 'invalid' }), e => e.code === 'INVALID_PAYLOAD');
+  room = move(room, { type: 'fill-bots', playerId: 'p0' }); room = move(room, { type: 'start', playerId: 'p0' });
+  assert.throws(() => move(room, { type: 'set-avatar', playerId: 'p1', avatarId: 'bold' }), e => e.code === 'ROOM_STARTED');
+  room = move(room, { type: 'bot-takeover', playerId: 'p1', offlineSince: ctx.now });
+  assert.equal(room.seats[5].kind, 'bot'); assert.equal(seatInfos(room)[5].avatarId, 'anu');
+  room = move(room, { type: 'connect', playerId: 'p1' });
+  assert.equal(room.seats[5].kind, 'human'); assert.equal(seatInfos(room)[5].avatarId, 'anu');
+  // Rematch preserves the player roster; the terminal state itself is not relevant to avatar identity.
+  room = move({ ...room, status: 'finished', game: { ...room.game, state: { ...room.game.state, phase: 'match-over' } } }, { type: 'rematch', playerId: 'p0' });
+  assert.equal(seatInfos(room)[5].avatarId, 'anu');
+  const old = makeRoom(); const { avatarId, ...legacy } = old.players.p0;
+  assert.equal(seatInfos({ ...old, players: { p0: legacy } })[0].avatarId, 'temu');
+});
+test('two socket clients receive avatar changes, reject in-game edits and restore identity after server restart', { timeout: 15000 }, async t => {
+  const config = loadConfig({ PUBLIC_ORIGIN:'http://127.0.0.1', PORT:'0', HOST:'127.0.0.1', SESSION_SECRET:'s'.repeat(40), LOG_LEVEL:'silent', BOT_DELAY_MS:'60000' });
+  const repo = new MemoryRepository(); let app = await createApp(config, { repo }); let base;
+  const sockets = []; t.after(async () => { sockets.forEach(s => s.disconnect()); await app.close(); });
+  async function listen() { base = `http://127.0.0.1:${(await app.listen()).port}`; } await listen();
+  const post = async (path, body) => { const r = await fetch(base+path, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); assert(r.ok, await r.clone().text()); return r.json(); };
+  const host = await post('/api/rooms', { name:'Host', avatarId:'sarnai' });
+  const guest = await post(`/api/rooms/${host.code}/join`, { name:'Guest', avatarId:'sarnai' });
+  const connect = session => new Promise((resolve,reject) => {
+    const socket = io(base,{auth:{token:session.token},transports:['websocket'],reconnection:false}); sockets.push(socket);
+    const client = { socket, state:null }; socket.on('room:state', state => {client.state=state;resolve(client);});socket.once('connect_error',reject);
+  });
+  const h = await connect(host), g = await connect(guest);
+  const request = (client,event,payload={}) => client.socket.timeout(2000).emitWithAck(event,payload);
+  assert((await request(g,'room:setAvatar',{avatarId:'naraa'})).ok);
+  await request(h,'room:sync'); assert.equal(h.state.seats[1].avatarId,'naraa');
+  assert((await request(g,'room:move',{seat:6})).ok);
+  await request(h,'room:sync'); assert.equal(h.state.seats[6].avatarId,'naraa');
+  assert.equal((await request(g,'room:setAvatar',{avatarId:'bold',playerId:host.playerId})).code,'INVALID_PAYLOAD');
+  assert((await request(h,'room:fillBots')).ok); assert((await request(h,'room:start')).ok);
+  assert.equal((await request(g,'room:setAvatar',{avatarId:'bold'})).code,'ROOM_STARTED');
+  sockets.forEach(s=>s.disconnect()); await app.close(); app=await createApp(config,{repo}); await listen();
+  const restored=await connect(guest); assert.equal(restored.state.you.seat,6); assert.equal(restored.state.seats[6].avatarId,'naraa');
+});

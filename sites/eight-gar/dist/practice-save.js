@@ -1,3 +1,4 @@
+import { normalizeAvatar } from './rules/avatars.js';
 import { reconcileSignals } from './rules/signals.js';
 import { createDeck, SUITS } from './rules/engine.js';
 
@@ -29,5 +30,5 @@ function validSaved(value) {
 export function readSavedMatch(value) {
   if (value?.format === 1 && value.state) value = { ...value, format: 2, state: { ...value.state, sleeping: [] } };
   if (!validSaved(value)) return null;
-  return { format: 2, state: { ...value.state, openingTeam: value.state.openingTeam ?? null }, byRank: value.byRank === true, signals: reconcileSignals(value.state, value.signals) };
+  return { format: 2, avatarId: normalizeAvatar(value.avatarId), state: { ...value.state, openingTeam: value.state.openingTeam ?? null }, byRank: value.byRank === true, signals: reconcileSignals(value.state, value.signals) };
 }

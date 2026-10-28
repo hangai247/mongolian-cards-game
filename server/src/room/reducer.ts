@@ -5,16 +5,18 @@ import {
 } from 'mongolian-eight-gar-engine';
 import { findPlay, chooseComputerLeader } from 'mongolian-eight-gar-engine/strategy';
 import { advanceSignals, setSignal, type SetSize } from 'mongolian-eight-gar-engine/signals';
+import { normalizeAvatar, isAvatarId, type AvatarId } from 'mongolian-eight-gar-engine/avatars';
 import type { Timing } from '../config.js';
 import type { Cause, ClientEvent } from '../protocol.js';
 import { RoomError, SEAT_COUNT, type GameMeta, type Player, type RoomSnapshot, type SeatSlot } from './model.js';
 
 export type Command =
   | { readonly type: 'signal'; readonly playerId: string; readonly size: SetSize; readonly enabled: boolean; readonly expectedRevision: number }
-  | { readonly type: 'join'; readonly playerId: string; readonly name: string }
+  | { readonly type: 'join'; readonly playerId: string; readonly name: string; readonly avatarId?: AvatarId }
   | { readonly type: 'leave'; readonly playerId: string }
   | { readonly type: 'connect'; readonly playerId: string }
   | { readonly type: 'disconnect'; readonly playerId: string }
+  | { readonly type: 'set-avatar'; readonly playerId: string; readonly avatarId: AvatarId }
   | { readonly type: 'move'; readonly playerId: string; readonly seat: number }
   | { readonly type: 'set-bot'; readonly playerId: string; readonly seat: number; readonly bot: boolean }
   | { readonly type: 'fill-bots'; readonly playerId: string }
@@ -62,13 +64,14 @@ export interface CreateRoomInput {
   readonly code: string;
   readonly hostPlayerId: string;
   readonly hostName: string;
+  readonly avatarId?: AvatarId;
   readonly now: number;
 }
 
 export function createRoom(input: CreateRoomInput): RoomSnapshot {
   const seats: SeatSlot[] = Array.from({ length: SEAT_COUNT }, () => ({ kind: 'empty' }));
   seats[0] = { kind: 'human', playerId: input.hostPlayerId };
-  const host: Player = { id: input.hostPlayerId, name: input.hostName, seat: 0, connected: false, offlineSince: input.now, lastSeenAt: input.now };
+  const host: Player = { id: input.hostPlayerId, name: input.hostName, avatarId: normalizeAvatar(input.avatarId), seat: 0, connected: false, offlineSince: input.now, lastSeenAt: input.now };
   return {
     id: input.id, code: input.code, version: 0, status: 'lobby', hostPlayerId: input.hostPlayerId,
     seats, players: { [host.id]: host }, game: null, createdAt: input.now, updatedAt: input.now,
@@ -255,7 +258,7 @@ export function applyCommand(snapshot: RoomSnapshot, command: Command, ctx: Ctx)
       }
       const seat = snapshot.seats.findIndex(slot => slot.kind === 'empty');
       if (seat < 0) throw new RoomError('ROOM_FULL', 'All eight seats are taken.');
-      const player: Player = { id: command.playerId, name: command.name, seat, connected: false, offlineSince: ctx.now, lastSeenAt: ctx.now };
+      const player: Player = { id: command.playerId, name: command.name, avatarId: normalizeAvatar(command.avatarId), seat, connected: false, offlineSince: ctx.now, lastSeenAt: ctx.now };
       const next: RoomSnapshot = {
         ...snapshot, seats: withSeat(snapshot.seats, seat, { kind: 'human', playerId: player.id }), players: withPlayer(snapshot.players, player),
       };
@@ -306,6 +309,15 @@ export function applyCommand(snapshot: RoomSnapshot, command: Command, ctx: Ctx)
       if (snapshot.seats[player.seat]?.kind !== 'human') return unchanged(snapshot);
       const offline: Player = { ...player, connected: false, offlineSince: ctx.now, lastSeenAt: ctx.now };
       return takeOverSeat({ ...snapshot, players: withPlayer(snapshot.players, offline) }, offline, ctx, 'leave');
+    }
+    case 'set-avatar': {
+      const player = requirePlayer(snapshot, command.playerId);
+      requireLobby(snapshot);
+      if (!isAvatarId(command.avatarId)) throw new RoomError('INVALID_PAYLOAD', 'Unknown avatar.');
+      if (player.avatarId === command.avatarId) return unchanged(snapshot);
+      return commit({ ...snapshot, players: withPlayer(snapshot.players, { ...player, avatarId: command.avatarId }) }, ctx, {
+        engineEvents: [], roomEvents: [], cause: 'action', rosterChanged: true, gameChanged: false, audit: null,
+      });
     }
     case 'move': {
       const player = requirePlayer(snapshot, command.playerId);

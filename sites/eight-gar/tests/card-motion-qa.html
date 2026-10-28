@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><title>Card depth and movement checks</title>
+<link rel="stylesheet" href="../dist/styles.css"><link rel="stylesheet" href="../dist/card-depth.css">
+<style>
+body{margin:0;background:#153e32;font:14px system-ui;color:#fff}header{padding:20px}button{padding:10px}#output{white-space:pre-wrap;padding:0 20px}.stage{height:440px;position:relative}#highest{position:absolute;top:20px;left:25%;display:flex;width:50%;height:130px;gap:5px;align-items:center;justify-content:center}#highest .card{width:60px;height:90px}#hand{position:absolute;top:270px;left:10%;width:80%;height:150px;display:flex;justify-content:center;gap:5px}.hand .card{margin:0;width:70px;height:105px;transform:rotate(var(--fan));transform-origin:center}.seat-1{position:absolute;left:75%;top:170px;width:90px;height:80px}.hand-back{left:0;bottom:0;width:38px;height:58px;transform:translateX(var(--back-x)) rotate(var(--back-angle));transform-origin:center}.tiny-deck{position:absolute;left:10%;top:180px;width:38px;height:58px;background:#743d31}#card-motion{z-index:1}
+</style>
+<body class="ger-table"><header><button id="run">Run motion checks</button> <button id="play-demo">Replay play</button> <button id="pickup-demo">Replay pickup</button> <strong id="status">Ready</strong></header><pre id="output"></pre><div class="stage"><div id="highest"></div><div id="hand" class="hand"></div><div class="seat-1"></div><div class="tiny-deck"></div></div><div id="card-motion"></div>
+<script type="module">
+import {animateStep} from '../dist/motion.js';
+const $=id=>document.getElementById(id), cards=Array.from({length:12},(_,i)=>({id:'qa-'+i,rank:String(i%9+2)}));
+const assert=(value,label)=>{if(!value)throw Error(label);$('output').textContent+='✓ '+label+'\n';};
+function face(card){const node=document.createElement('div');node.className='card';node.textContent=card.rank+' ♠';node.dataset.publicId=card.id;return node;}
+function hand(list){$('hand').replaceChildren(...list.map((card,i)=>{const n=face(card);delete n.dataset.publicId;n.dataset.cardId=card.id;n.style.setProperty('--fan',`${i%2?3:-3}deg`);return n;}));}
+function pile(list){$('highest').replaceChildren(...list.map(face));}
+function backs(count){document.querySelector('.seat-1').replaceChildren(...Array.from({length:count},(_,i)=>{const n=document.createElement('div');n.className='hand-back';n.style.setProperty('--back-x',`${i*4}px`);n.style.setProperty('--back-angle',`${i*2}deg`);return n;}));}
+function start(type,count=3,player=0){
+ const list=cards.slice(0,count);hand(type==='play'&&player===0?list:[]);pile(['pickup','sleep'].includes(type)?list:[]);backs(type==='play'?count:0);
+ const after={},controller=new AbortController();let renders=0;
+ const pending=animateStep({type,player,cards:list,before:{hands:Array.from({length:8},()=>[])},after},{signal:controller.signal,cardElement:face,render(){renders++;hand(type!=='play'&&type!=='sleep'&&player===0?list:[]);pile(type==='play'?list:[]);backs(type!=='play'&&type!=='sleep'&&player===1?count:0);}});
+ return {pending,controller,get renders(){return renders;},animations:document.getAnimations()};
+}
+async function seek(run,fraction){run.animations.forEach(a=>a.pause());await Promise.all(run.animations.map(a=>a.ready));run.animations.forEach(a=>a.currentTime=Number(a.effect.getTiming().duration)*fraction+Number(a.effect.getTiming().delay));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
+function bounds(n){return n.getBoundingClientRect();}
+async function finish(run){run.animations.forEach(a=>a.finish());await run.pending;assert(!$('card-motion').children.length&&!$('card-motion').dataset.motion,'flight layer cleans up');assert(!document.querySelector('[style*="visibility: hidden"]'),'destinations are revealed');}
+async function checks(){
+ $('status').textContent='Running';$('output').textContent='';
+ try{
+ let run=start('play');await seek(run,1);
+ const flights=[...document.querySelectorAll('.flying-card')],targets=[...$('highest').children];
+ assert(flights.length===3&&flights.every((n,i)=>{const a=bounds(n),b=bounds(targets[i]);return Math.abs(a.x-b.x)<1&&Math.abs(a.y-b.y)<1&&Math.abs(a.width-b.width)<1&&Math.abs(a.height-b.height)<1;}),'play lands on the rotated resting face within 1px');await finish(run);
+ for(const player of [0,1]){
+ run=start('pickup',12,player);await seek(run,.27);
+ const boxes=[...document.querySelectorAll('.flying-card')].map(bounds);
+ assert(Math.max(...boxes.map(b=>b.x))-Math.min(...boxes.map(b=>b.x))<10&&Math.max(...boxes.map(b=>b.y))-Math.min(...boxes.map(b=>b.y))<10,`player ${player}: whole pile gathers before departure`);
+ await seek(run,.68);
+ const moving=[...document.querySelectorAll('.flying-card')].map(bounds);
+ assert(Math.max(...moving.map(b=>b.x))-Math.min(...moving.map(b=>b.x))<10,`player ${player}: cards travel together as a stack`);await finish(run);
+ }
+ for(const type of ['refill','sleep']){run=start(type,3,1);await seek(run,.5);if(type==='refill')assert(document.querySelectorAll('.anonymous-flight').length===3,'opponent refill reveals no card faces');await finish(run);}
+ for(const phase of [.1,.3,.7]){run=start('pickup',12);await seek(run,phase);run.controller.abort();await run.pending;assert(!$('card-motion').children.length&&!document.querySelector('[style*="visibility: hidden"]')&&run.renders===1,`cancellation at ${phase*100}% removes flights and reveals destinations`);}
+ $('status').textContent='All motion checks passed';
+ }catch(error){$('status').textContent='Failed';$('output').textContent+='✗ '+error.stack;}
+}
+$('run').onclick=checks;
+for(const type of ['play','pickup'])$(type+'-demo').onclick=async()=>{if(document.getAnimations().length)return;const run=start(type,type==='pickup'?8:3);await run.pending;};
+hand(cards.slice(0,3));pile(cards.slice(3,6));
+</script>

@@ -80,7 +80,7 @@ Artwork and exact built-in generation prompts: `dist/assets/ger-table-v3-prompts
 
 Validation: 126 engine tests, 44 client tests, 28 server tests, TypeScript checking, and browser runners for practice (320×568 through 1440×900, plus landscape), online lobby/room/game, and round/match review. Browser checks include selection/sorting, legal defense, opener confirmation, stacked piles, pickup/refill/sleep, large hands, rotation, and reduced motion. Use the `Reference preview` scenario in `tests/browser-qa.html` on a disposable origin to review the reference hand. No production deployment is performed by these preview runners.
 
-Control refinement (v4): microphone mute/unmute (online) and sound mute/unmute (practice) sit at the bottom beside private team signals and sorting. Shared SVG icons in `dist/control-icons.js` replace text-symbol controls and survive game rerenders. Translucent charcoal panels, silver borders, circular utility buttons, and the turquoise play action follow the supplied reference. Mobile targets remain at least 44px; labels, pressed states, keyboard focus and disabled actions are retained. The room invite icon copies the existing share link. Updated previews: `../ger-controls-desktop-v4.png` and `../ger-controls-mobile-v4.png`.
+Control refinement (v4): microphone mute/unmute (online) and sound mute/unmute (practice) sit at the bottom beside private team signals and sorting. Shared SVG icons in `dist/control-icons.js` replace text-symbol controls and survive game rerenders. Translucent charcoal panels, silver borders, circular utility buttons, and the turquoise play action follow the supplied reference. Mobile targets remain at least 44px; labels, pressed states, keyboard focus and disabled actions are retained. The room-code copy control shares the existing link; the duplicate invite icon has been removed. Updated previews: `../ger-controls-desktop-v4.png` and `../ger-controls-mobile-v4.png`.
 
 Mobile readability: set signals remain visible beside audio and sorting, with 44px touch targets and a checked state. Court ranks and suits use card-relative gutters clear of the artwork, including small landscape hands. Phone seat labels, turn guidance and pile information use larger text. The browser QA court scenario checks both signal toggles and rank/art separation from 320px phones through desktop.
 
@@ -91,3 +91,23 @@ Online and practice tables request a Screen Wake Lock during opening discussion 
 `screen-wake-lock.test.mjs` covers lifecycle, preference persistence, pending-request cancellation, browser revocation/rejection and unsupported environments. Actual display sleep behavior still needs a physical iPhone/Android check.
 
 Move suggestions have been removed: the practice table has no lightbulb button or automatic selection of a suggested hand. Players select their own cards; computer turns still use the shared strategy engine.
+
+## Responsive entrance lobby
+
+`dist/lobby-entry.css` and `dist/lobby-entry.js` implement the desktop two-column welcome panel and phone form over the existing ger artwork. `lobby-home` scopes the entrance presentation so room seating and the live game retain their layouts. The scoreboard appears after dealing. Inputs remain at least 16px and actions at least 48px, with safe-area padding, visible focus, and a scrollable entrance on short screens. The invitation URL retains its join-only flow.
+
+The entrance follows `VisualViewport` resize and pan events above software keyboards, with a layout-viewport fallback. It collapses the decorative heading while editing, keeps that compact form during button focus, and restores the scene when the keyboard closes. Touch devices do not autofocus a field on arrival. Successful room entry dismisses the keyboard; validation keeps the field and error available. This does not change card rules, sessions, voice, or practice behavior.
+
+Validation: `npm test -w sites/eight-gar` includes keyboard lifecycle regressions. On a disposable local game server, temporarily symlink `tests/lobby-entry-qa.html` into `dist/`, then open `/lobby-entry-qa.html` and run the checks. The runner covers 320/390/430/700/844/1440px layouts, touch targets, scroll reachability, simulated 480px and 260px keyboard viewports, validation, create/deal, and invitation join. Remove the symlink afterward. Physical iOS/Android keyboard and rotation behavior still require a device check.
+
+Waiting-room refinement: `dist/lobby-room.css` carries the entrance palette into a wide invitation-and-seating panel. Live occupancy and per-team counts update with the roster; phones stack the teams and retain the host actions in a sticky footer (short screens use normal scrolling). Native seat-move and bot buttons are siblings, preventing keyboard activation of a bot control from also moving the player. Roster updates restore focus to the corresponding action. `lobby-waiting` is cleared on dealing or leaving, so these styles do not affect gameplay. The local lobby QA runner also checks waiting-room touch targets at five sizes, bot add/remove, team/seat switching, occupancy, focus retention, and guest-only control visibility. The existing 58 client tests and extended browser runner pass.
+
+### Selectable avatars
+
+Online and practice players can choose one of seven still characters. The browser remembers the choice; online rooms permit changes only while waiting. Characters are now separate layers over people-free v5 room artwork, with a persistent local portrait. See [avatar behavior, verification and artwork prompts](docs/selectable-avatars.md). The root build now also copies the shared avatar catalog; the server applies migration `002_player_avatars.sql` at startup.
+
+### Card depth and movement
+
+`dist/card-depth.css` adds paper edges, contact shadows, a small lift tilt and stable resting angles to both tables. `dist/motion.js` keeps the existing arc and flip, matches rotated landing bounds, eases played cards onto the felt, and gathers pickups into a bounded stack before traveling and spreading into the destination hand. Reduced motion, private opponent draws, offscreen hand destinations and cancellation retain their existing behavior.
+
+On a disposable local origin, open `tests/card-motion-qa.html` and run the motion checks. It verifies landing alignment, gathering and shared travel for both player types, private refills, sleep cleanup and cancellation during three pickup phases; replay buttons show the play and pickup sequences.

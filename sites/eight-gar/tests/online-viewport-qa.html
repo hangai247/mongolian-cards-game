@@ -7,8 +7,12 @@ const assert=(value,message)=>{if(!value)throw Error(message);output.textContent
 const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;await new Promise(r=>setTimeout(r,25));}throw Error('Timed out');};
 function check(width,height,label){
  const doc=frame.contentDocument;
+ if(doc.body.classList.contains('has-match')){
+  const own=doc.querySelector('#self-avatar-chip').getBoundingClientRect();
+  for(const selector of ['.brand','.room-badge']){const other=doc.querySelector(selector).getBoundingClientRect();assert(own.right<=other.left||own.left>=other.right||own.bottom<=other.top||own.top>=other.bottom,label+': own avatar does not overlap '+selector);}
+ }
  assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,label+': page fits');
- for(const id of ['rules-open','new-match','copy-link','invite-friend','voice-mic','team-signals-panel','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup']){
+ for(const id of ['rules-open','new-match','copy-link','voice-mic','team-signals-panel','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup']){
   const node=doc.getElementById(id);if(!node||!node.getClientRects().length)continue;const box=node.getBoundingClientRect();
   assert(box.width>0&&box.height>0&&box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height+1,label+': '+id+' visible');
  }
@@ -20,6 +24,7 @@ document.querySelector('#run').onclick=async()=>{
   await waitFor(()=>doc.querySelector('#create')&&!doc.querySelector('#create').disabled);
   for(const [width,height] of [[320,568],[568,320],[390,844],[700,900],[844,390],[1440,900]]){frame.width=width;frame.height=height;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));check(width,height,`${width}×${height} lobby`);}
   frame.width=320;frame.height=568;
+  doc.querySelector('#entry-avatar-picker input[value=temu]').click();
   const name=doc.querySelector('#lobby-name');name.value='Alexanderthegreat';name.dispatchEvent(new Event('input',{bubbles:true}));doc.querySelector('#create').click();
   await waitFor(()=>!doc.querySelector('#lobby-room').hidden);
   check(320,568,'320×568 room');

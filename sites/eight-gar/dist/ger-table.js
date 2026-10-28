@@ -50,11 +50,6 @@ if(document.body.classList.contains('practice-table')){
  sound.onclick=()=>{enabled=!enabled;try{localStorage.setItem('eight-gar-sound',enabled?'on':'off');}catch{}document.dispatchEvent(new CustomEvent('table-sound-change',{detail:enabled}));update();};utility.prepend(sound);
 }
 if($('copy-link')){$('copy-link').innerHTML=icons.copy;$('copy-link').setAttribute('aria-label','Ширээний холбоос хуулах');$('copy-link').title='Ширээний холбоос хуулах';}
-if($('room-badge')){
- const invite=document.createElement('button');invite.id='invite-friend';invite.className='icon-button';invite.innerHTML=controlIcon('invite');invite.setAttribute('aria-label','Найз урих');invite.title='Найз урих · ширээний холбоос хуулах';
- invite.onclick=()=>$('copy-link').click();head.insertBefore(invite,settingsButton);
- const syncInvite=()=>{invite.hidden=$('room-badge').hidden;};new MutationObserver(syncInvite).observe($('room-badge'),{attributes:true,attributeFilter:['hidden']});syncInvite();
-}
 function updateSelection(){const count=Number(document.body.dataset.selection||0);const value=count?`${count} хөзөр сонгосон`:`${$('hand').children.length} хөзөр`;if(selection.textContent!==value)selection.textContent=value;}
 new MutationObserver(updateSelection).observe(document.body,{attributes:true,attributeFilter:['data-selection']});
 new MutationObserver(updateSelection).observe($('hand'),{childList:true});updateSelection();

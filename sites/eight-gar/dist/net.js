@@ -28,8 +28,8 @@ async function api(path, body) {
   return data;
 }
 
-export const createRoom = name => api('/api/rooms', { name });
-export const joinRoom = (code, name) => api(`/api/rooms/${encodeURIComponent(code)}/join`, { name });
+export const createRoom = (name, avatarId) => api('/api/rooms', { name, avatarId });
+export const joinRoom = (code, name, avatarId) => api(`/api/rooms/${encodeURIComponent(code)}/join`, { name, avatarId });
 export const roomInfo = code => api(`/api/rooms/${encodeURIComponent(code)}`);
 
 export function saveSession(result) {

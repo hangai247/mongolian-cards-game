@@ -1,3 +1,4 @@
+import type { AvatarId } from 'mongolian-eight-gar-engine/avatars';
 import type { State } from 'mongolian-eight-gar-engine';
 import type { Signals } from 'mongolian-eight-gar-engine/signals';
 import type { Cause, ErrorCode, TimerKind } from '../protocol.js';
@@ -11,6 +12,7 @@ export type SeatSlot =
 export interface Player {
   readonly id: string;
   readonly name: string;
+  readonly avatarId: AvatarId;
   readonly seat: number;
   readonly connected: boolean;
   readonly offlineSince: number | null;

@@ -1,0 +1,40 @@
+/* Paper edges stay crisp; the softer shadow describes distance from the felt. */
+.ger-table .highest .card {
+ --rest-angle:-.8deg;
+ transform:rotate(var(--rest-angle));
+ box-shadow:0 1px 0 #fff1d5,0 2px 0 #a89070,0 3px 2px #0003,1px 5px 8px #0004;
+}
+.ger-table .highest .table-play:nth-child(even) .card {--rest-angle:1deg}
+.ger-table .highest .card:nth-child(even) {--rest-angle:.6deg}
+.ger-table .hand .card {
+ box-shadow:inset 0 1px 2px #fff9,0 1px 0 #fff0d4,0 2px 0 #aa9274,0 3px 2px #0003,1px 5px 9px #0005;
+ transition:transform .24s cubic-bezier(.2,.7,.25,1),box-shadow .24s;
+}
+@media(hover:hover) and (prefers-reduced-motion:no-preference) {
+ .ger-table .hand .card:hover:not(:disabled):not(.selected) {
+  transform:translateY(calc(var(--lift,0px) - 12px)) perspective(700px) rotate(var(--fan,0deg)) rotateX(5deg) rotateY(-3deg);
+  box-shadow:0 0 0 1px #b6eee4,0 2px 0 #b39a79,2px 12px 17px #0005;
+ }
+ .ger-table .hand.wide-hand .card:hover:not(:disabled):not(.selected) {transform:translateY(-8px) perspective(700px) rotateX(5deg) rotateY(-3deg)}
+}
+.ger-table .hand .card.selected,
+.ger-table .hand .card.selected:hover:not(:disabled) {
+ transform:translateY(-12px) perspective(700px) rotateX(4deg) rotateY(-2deg);
+ box-shadow:0 0 0 1px #a0fff2,0 2px 0 #af9877,1px 12px 18px #0005,0 0 12px #00ffe555,inset 0 0 10px #a2f5dc55;
+}
+.ger-table .hand.wide-hand .card.selected,
+.ger-table .hand.wide-hand .card.selected:hover:not(:disabled) {transform:translateY(-8px) perspective(700px) rotateX(4deg) rotateY(-2deg)}
+#card-motion {perspective:none}
+.flying-card {transform-origin:50% 50%}
+.flying-lift {width:100%;height:100%;border-radius:7px;transform-style:preserve-3d}
+.flying-card .flight-front {transform:translateZ(.6px)}
+.flying-card .flight-back {transform:rotateY(180deg) translateZ(.6px)}
+.flying-card .flight-front,.flying-card .flight-back {
+ box-shadow:inset 0 1px 1px #fff8,0 1px 0 #fff0d4,0 2px 0 #aa9274;
+}
+@media(prefers-reduced-motion:reduce) {
+ .ger-table .hand .card.selected,
+.ger-table .hand .card.selected:hover:not(:disabled) {transform:translateY(-12px)}
+ .ger-table .hand.wide-hand .card.selected,
+.ger-table .hand.wide-hand .card.selected:hover:not(:disabled) {transform:translateY(-8px)}
+}

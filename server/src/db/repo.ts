@@ -1,3 +1,4 @@
+import { normalizeAvatar } from 'mongolian-eight-gar-engine/avatars';
 import type { Pool } from './pool.js';
 import type { Audit } from '../room/reducer.js';
 import type { GameMeta, Player, RoomSnapshot, SeatSlot } from '../room/model.js';
@@ -54,7 +55,7 @@ interface RoomRow {
   id: string; code: string; status: string; host_player_id: string; version: string; seats: SeatSlot[];
   created_at_ms: string; updated_at_ms: string;
 }
-interface PlayerRow { id: string; room_id: string; display_name: string; seat: number; last_seen_at_ms: string }
+interface PlayerRow { id: string; room_id: string; display_name: string; avatar_id: string; seat: number; last_seen_at_ms: string }
 interface GameRow { room_id: string; state: GameMeta['state']; meta: Omit<GameMeta, 'state'> }
 
 const ms = (value: string | number): number => Math.round(Number(value));
@@ -120,8 +121,8 @@ export class PgRepository implements Repository {
     await client.query('DELETE FROM players WHERE room_id = $1', [snapshot.id]);
     for (const player of Object.values(snapshot.players)) {
       await client.query(
-        `INSERT INTO players (id, room_id, display_name, seat, last_seen_at) VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0))`,
-        [player.id, snapshot.id, player.name, player.seat, player.lastSeenAt],
+        `INSERT INTO players (id, room_id, display_name, seat, last_seen_at, avatar_id) VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6)`,
+        [player.id, snapshot.id, player.name, player.seat, player.lastSeenAt, normalizeAvatar(player.avatarId)],
       );
     }
   }
@@ -136,7 +137,7 @@ export class PgRepository implements Repository {
     if (rooms.rows.length === 0) return [];
     const ids = rooms.rows.map(row => row.id);
     const players = await this.pool.query<PlayerRow>(
-      `SELECT id, room_id, display_name, seat, EXTRACT(EPOCH FROM last_seen_at) * 1000 AS last_seen_at_ms FROM players WHERE room_id = ANY($1)`,
+      `SELECT id, room_id, display_name, avatar_id, seat, EXTRACT(EPOCH FROM last_seen_at) * 1000 AS last_seen_at_ms FROM players WHERE room_id = ANY($1)`,
       [ids],
     );
     const games = await this.pool.query<GameRow>('SELECT room_id, state, meta FROM game_states WHERE room_id = ANY($1)', [ids]);
@@ -145,7 +146,7 @@ export class PgRepository implements Repository {
       const roomPlayers: Record<string, Player> = {};
       for (const player of players.rows.filter(candidate => candidate.room_id === row.id)) {
         roomPlayers[player.id] = {
-          id: player.id, name: player.display_name, seat: player.seat, connected: false,
+          id: player.id, name: player.display_name, avatarId: normalizeAvatar(player.avatar_id), seat: player.seat, connected: false,
           offlineSince: ms(row.updated_at_ms), lastSeenAt: ms(player.last_seen_at_ms),
         };
       }

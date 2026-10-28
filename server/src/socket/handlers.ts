@@ -56,6 +56,7 @@ export function registerHandlers(io: IoServer, deps: HandlerDeps): void {
     const simple = (outcome: Outcome): Ack<Empty> => runtime.ack(outcome, () => ({}));
 
     bind('room:sync', async () => { runtime.sendState(playerId, socket); return { ok: true }; });
+    bind('room:setAvatar', async ({ avatarId }) => simple(await runtime.enqueue({ type: 'set-avatar', playerId, avatarId })));
     bind('room:move', async ({ seat }) => simple(await runtime.enqueue({ type: 'move', playerId, seat })));
     bind('room:setBot', async ({ seat, bot }) => simple(await runtime.enqueue({ type: 'set-bot', playerId, seat, bot })));
     bind('room:fillBots', async () => simple(await runtime.enqueue({ type: 'fill-bots', playerId })));

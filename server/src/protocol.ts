@@ -1,9 +1,12 @@
 /** Wire contract between browser and server. Every inbound payload is validated with these schemas. */
 import { z } from 'zod';
+import { AVATAR_IDS, DEFAULT_AVATAR, type AvatarId } from 'mongolian-eight-gar-engine/avatars';
+
 import type { Card, Event as EngineEvent, PlayerView, Suit, Team, ErrorCode as EngineErrorCode } from 'mongolian-eight-gar-engine';
 import { CODE_PATTERN, normalizeCode } from './codes.js';
 import type { Signals } from 'mongolian-eight-gar-engine/signals';
 
+export const Avatar = z.enum(AVATAR_IDS);
 export const DisplayName = z.string().trim().min(1).max(20).regex(/^[^\p{C}]+$/u, 'Use printable characters only');
 export const RoomCodeInput = z.string().min(1).max(16).transform(normalizeCode).pipe(z.string().regex(CODE_PATTERN, 'Room codes are six letters or digits'));
 export const Seat = z.number().int().min(0).max(7);
@@ -11,11 +14,12 @@ export const Revision = z.number().int().min(0).max(1_000_000_000);
 export const CardId = z.string().min(1).max(40);
 export const ActionId = z.uuid();
 
-export const CreateRoomBody = z.object({ name: DisplayName }).strict();
-export const JoinRoomBody = z.object({ name: DisplayName }).strict();
+export const CreateRoomBody = z.object({ name: DisplayName, avatarId: Avatar.default(DEFAULT_AVATAR) }).strict();
+export const JoinRoomBody = z.object({ name: DisplayName, avatarId: Avatar.default(DEFAULT_AVATAR) }).strict();
 
 export const C2S = {
   'room:sync': z.object({}).strict(),
+  'room:setAvatar': z.object({ avatarId: Avatar }).strict(),
   'room:move': z.object({ seat: Seat }).strict(),
   'room:setBot': z.object({ seat: Seat, bot: z.boolean() }).strict(),
   'room:fillBots': z.object({}).strict(),
@@ -48,6 +52,7 @@ export interface SeatInfo {
   readonly kind: SeatKind;
   readonly team: Team;
   readonly name: string | null;
+  readonly avatarId: AvatarId | null;
   readonly playerId: string | null;
   readonly connected: boolean;
   readonly isHost: boolean;
@@ -128,6 +133,6 @@ export interface JoinResult { readonly code: string; readonly playerId: string; 
 export interface PublicRoomInfo {
   readonly code: string;
   readonly status: 'lobby' | 'playing' | 'finished';
-  readonly seats: readonly { readonly seat: number; readonly kind: SeatKind; readonly name: string | null }[];
+  readonly seats: readonly { readonly seat: number; readonly kind: SeatKind; readonly name: string | null; readonly avatarId: AvatarId | null }[];
   readonly humanCount: number;
 }

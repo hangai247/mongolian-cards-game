@@ -12,11 +12,15 @@ import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
+import { mountAvatarPicker, rememberedAvatar, rememberAvatar, avatarImage, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
 const $ = id => document.getElementById(id);
 const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null; } });
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const STORAGE = 'naiman-gar-practice-v1';
+let practiceAvatar = normalizeAvatar(rememberedAvatar());
+const practicePicker = mountAvatarPicker($('practice-avatar-picker'), { value: rememberedAvatar(), onChange: rememberAvatar });
+const newPicker = mountAvatarPicker($('new-avatar-picker'), { value: rememberedAvatar(), onChange: rememberAvatar });
 // Pause after the previous play finishes animating, so a human can read the table before the next computer move.
 const COMPUTER_TURN_DELAY_MS = 5000;
 let state = null, selected = new Set(), liveMove = '', paused = false, byRank = false, timer = null, toastTimer = null;
@@ -48,7 +52,7 @@ function renderSignals() {
 let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0, motionText = '';
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=ger3.2').then(({CharacterRoom}) => {
+import('./photographic-room.js?v=avatars1').then(({CharacterRoom}) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
@@ -84,7 +88,7 @@ function cardElement(card, interactive = false) {
 }
 function save() {
   if (!state) return;
-  try { localStorage.setItem(STORAGE, JSON.stringify({ format: 2, state, byRank, signals })); }
+  try { localStorage.setItem(STORAGE, JSON.stringify({ format: 2, state, byRank, signals, avatarId: practiceAvatar })); }
   catch { if (storageAvailable) { storageAvailable = false; toast('Хөтөч тоглолтыг хадгалах боломжгүй байна. Энэ хуудсыг нээлттэй байлгах хугацаанд л тоглолт үргэлжилнэ.'); } }
 }
 function restore() {
@@ -94,6 +98,7 @@ function restore() {
     const value = readSavedMatch(parsed);
     if (!value) { localStorage.removeItem(STORAGE); toast('Өмнөх тоглолтыг сэргээж чадсангүй. Шинэ тоглолт эхлүүлнэ үү.'); return; }
     state = { ...value.state, openingTeam: value.state.openingTeam ?? null };
+    practiceAvatar = value.avatarId;
     signals = reconcileSignals(state, parsed.signals);
     byRank = value.byRank === true; paused = state.phase === 'playing';
     save(); // Persist the migrated schema without a move history.
@@ -160,6 +165,7 @@ function renderActions() {
 function render(scene = state, motion = null) {
   document.body.classList.toggle('has-match', !!scene);
   document.dispatchEvent(new CustomEvent('game-activity', { detail: { active: ['choosing-leader', 'playing'].includes(scene?.phase) && !paused } }));
+  renderSelfAvatar(practiceAvatar);
   $('welcome').hidden = !!scene;
   $('table-stats').hidden = !scene;
   $('score-us').textContent = scene?.scores[0] || 0;
@@ -183,6 +189,7 @@ function render(scene = state, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${NAMES[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}`);
     seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${NAMES[index]}</span></span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
+    if (index === 0) seat.querySelector('.avatar').replaceChildren(avatarImage(practiceAvatar));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${NAMES[index]} · ${shownCount} далд хөзөртэй`);
@@ -197,7 +204,7 @@ function render(scene = state, motion = null) {
     $(index === 0 ? 'self-seat' : 'seats').append(seat);
   }
   renderTableInsights({ scene, motion, counts: shownCounts, names: NAMES, paused, animating });
-  characterRoom.update({handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
+  characterRoom.update({avatars: Array.from({length: 8}, (_, index) => index === 0 ? practiceAvatar : botAvatar(index)), handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
   $('highest').replaceChildren();
   $('pile-key').hidden = !scene?.table.pile.length;
   if (scene?.table.pile.length) {
@@ -352,9 +359,16 @@ $('rules-open').addEventListener('click', () => openDialog('rules-dialog'));
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
-$('start').addEventListener('click', startMatch);
-$('new-match').addEventListener('click', () => state ? openDialog('new-dialog') : startMatch());
-$('new-confirm').addEventListener('click', () => { $('new-dialog').close(); startMatch(); });
+function startWithPicker(picker) {
+  if (!picker.value) { picker.requireChoice(); return false; }
+  practiceAvatar = picker.value; rememberAvatar(practiceAvatar); startMatch(); return true;
+}
+$('start').addEventListener('click', () => startWithPicker(practicePicker));
+$('new-match').addEventListener('click', () => {
+  if (!state) { startWithPicker(practicePicker); return; }
+  newPicker.setValue(rememberedAvatar() ?? practiceAvatar); openDialog('new-dialog');
+});
+$('new-confirm').addEventListener('click', () => { if (startWithPicker(newPicker)) $('new-dialog').close(); });
 $('pause').addEventListener('click', () => { stopEffects(); paused = !paused; clearBot(); if (animating) motionController?.abort(); else { render(); scheduleBot(); } });
 $('sort').addEventListener('click', () => { byRank = !byRank; if (state) { renderHand(); save(); } });
 $('play').addEventListener('click', () => { if (state?.turn === 0 && !paused && selected.size) commit({ type: 'play', cards: [...selected] }); });

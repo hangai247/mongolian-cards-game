@@ -52,7 +52,7 @@ export function createHttpApp(deps: HttpDeps): express.Express {
     if (!createLimiter.hit(ip(req))) return fail(res, 'RATE_LIMITED', 'Too many tables created from your network. Try again later.');
     const body = CreateRoomBody.safeParse(req.body);
     if (!body.success) return fail(res, 'INVALID_PAYLOAD', body.error.issues[0]?.message ?? 'Invalid request.');
-    const { runtime, playerId } = await registry.create(body.data.name);
+    const { runtime, playerId } = await registry.create(body.data.name, body.data.avatarId);
     const token = signSession(config.sessionSecret, { roomId: runtime.id, playerId, iat: clock.now() });
     const result: JoinResult = { code: runtime.code, playerId, seat: 0, token };
     res.status(201).json(result);
@@ -68,7 +68,7 @@ export function createHttpApp(deps: HttpDeps): express.Express {
       if (!lookupLimiter.hit(ip(req))) return fail(res, 'RATE_LIMITED', 'Too many unknown codes from your network. Try again later.');
       return fail(res, 'ROOM_NOT_FOUND', 'No table has that code.');
     }
-    const { runtime, playerId, seat } = await registry.join(code.data, body.data.name);
+    const { runtime, playerId, seat } = await registry.join(code.data, body.data.name, body.data.avatarId);
     const token = signSession(config.sessionSecret, { roomId: runtime.id, playerId, iat: clock.now() });
     const result: JoinResult = { code: runtime.code, playerId, seat, token };
     res.json(result);

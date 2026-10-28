@@ -1,3 +1,4 @@
+import { DEFAULT_AVATAR, type AvatarId } from 'mongolian-eight-gar-engine/avatars';
 import { randomUUID } from 'node:crypto';
 import type { Repository } from '../db/repo.js';
 import type { Logger } from '../logger.js';
@@ -34,23 +35,23 @@ export class RoomRegistry {
   get(code: string): RoomRuntime | undefined { return this.byCode.get(code); }
   getById(id: string): RoomRuntime | undefined { return this.byId.get(id); }
 
-  async create(hostName: string): Promise<{ runtime: RoomRuntime; playerId: string }> {
+  async create(hostName: string, avatarId: AvatarId = DEFAULT_AVATAR): Promise<{ runtime: RoomRuntime; playerId: string }> {
     let code = generateCode();
     for (let attempt = 0; this.byCode.has(code) && attempt < 10; attempt++) code = generateCode();
     if (this.byCode.has(code)) throw new RoomError('SERVER_ERROR', 'Could not allocate a room code.');
     const playerId = randomUUID();
-    const snapshot = createRoom({ id: randomUUID(), code, hostPlayerId: playerId, hostName, now: this.deps.clock.now() });
+    const snapshot = createRoom({ id: randomUUID(), code, hostPlayerId: playerId, hostName, avatarId, now: this.deps.clock.now() });
     await this.repo.createRoom(snapshot);
     const runtime = this.register(snapshot);
     this.log.info({ room: code }, 'room created');
     return { runtime, playerId };
   }
 
-  async join(code: string, name: string): Promise<{ runtime: RoomRuntime; playerId: string; seat: number }> {
+  async join(code: string, name: string, avatarId: AvatarId = DEFAULT_AVATAR): Promise<{ runtime: RoomRuntime; playerId: string; seat: number }> {
     const runtime = this.byCode.get(code);
     if (!runtime) throw new RoomError('ROOM_NOT_FOUND', 'No table has that code.');
     const playerId = randomUUID();
-    const outcome = await runtime.enqueue({ type: 'join', playerId, name });
+    const outcome = await runtime.enqueue({ type: 'join', playerId, name, avatarId });
     if (!outcome.ok) throw new RoomError(outcome.code, outcome.message);
     const seat = outcome.result.snapshot.players[playerId]?.seat;
     if (seat === undefined) throw new RoomError('SERVER_ERROR', 'Join did not assign a seat.');

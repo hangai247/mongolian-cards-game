@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Avatar visual and interaction QA</title>
+<style>body{margin:0;background:#18221e;color:#f6e8ce;font:14px system-ui}header{padding:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}button{padding:10px;cursor:pointer}pre{padding:16px;max-height:170px;overflow:auto;white-space:pre-wrap}iframe{border:0;display:block;background:#101b16}iframe[hidden]{display:none}#game{margin:auto}#gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;padding:20px}figure{margin:0}figcaption{padding:8px}#gallery iframe{width:100%}</style>
+<header><button id="run">Run practice checks</button><button id="wide">All avatars · wide</button><button id="portrait">All avatars · portrait</button><span id="status">Ready · use a disposable local origin</span></header>
+<pre id="output"></pre><iframe id="game" title="Practice avatar test" width="390" height="844"></iframe><div id="gallery"></div>
+<script type="module">
+import {AVATARS} from '../dist/rules/avatars.js';
+const base=new URL('../dist/',location.href).href,frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const waitFor=async fn=>{for(let i=0;i<240;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Timed out');};
+const assert=(value,message)=>{if(!value)throw Error(message);output.textContent+='✓ '+message+'\n';};
+const loaded=()=>new Promise(r=>frame.addEventListener('load',r,{once:true}));
+const tick=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+async function load(){const ready=loaded();frame.src=base+'practice.html';await ready;await waitFor(()=>frame.contentDocument.querySelector('#practice-avatar-picker input'));}
+const choose=async (doc,host,id)=>{doc.querySelector(`#${host} input[value="${id}"]`).click();await tick();};
+document.querySelector('#run').onclick=async()=>{
+ status.textContent='Running';output.textContent='';frame.hidden=false;document.querySelector('#gallery').replaceChildren();
+ const saved=localStorage.getItem('naiman-gar-practice-v1'),pref=localStorage.getItem('gar:avatar');
+ try{
+  localStorage.removeItem('naiman-gar-practice-v1');localStorage.removeItem('gar:avatar');await load();let doc=frame.contentDocument;
+  doc.querySelector('#start').click();assert(!doc.body.classList.contains('has-match'),'First visit requires an avatar');
+  await choose(doc,'practice-avatar-picker','sarnai');assert(doc.querySelector('input[value="sarnai"]').checked,'Native radio selection');
+  doc.querySelector('#start').click();await waitFor(()=>doc.querySelectorAll('.room-actor:not([hidden])').length===7);
+  assert(JSON.parse(localStorage.getItem('naiman-gar-practice-v1')).avatarId==='sarnai','Practice saves selected avatar');
+  for(const [width,height] of [[320,568],[390,844],[844,390],[1440,900]]){
+   frame.width=width;frame.height=height;await tick();await waitFor(()=>[...doc.querySelectorAll('.room-actor')].every(i=>i.complete&&i.naturalWidth));
+   assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,`${width}×${height}: no page overflow`);
+   assert(doc.querySelectorAll('.room-actor:not([hidden])').length===7,`${width}×${height}: seven loaded characters`);
+   assert(doc.querySelector('#self-avatar-chip').dataset.avatarId==='sarnai',`${width}×${height}: own identity visible`);
+   const chip=doc.querySelector('#self-avatar-chip').getBoundingClientRect();assert(chip.width>0&&chip.left>=0&&chip.right<=width,`${width}×${height}: own portrait fits`);
+  }
+  localStorage.setItem('gar:avatar','bold');await load();doc=frame.contentDocument;await waitFor(()=>doc.body.classList.contains('has-match'));
+  assert(doc.querySelector('#self-avatar-chip').dataset.avatarId==='sarnai','Restored game wins over changed browser preference');
+  doc.querySelector('#new-match').click();await choose(doc,'new-avatar-picker','oyu');doc.querySelector('#new-dialog [data-close]').click();
+  assert(doc.querySelector('#self-avatar-chip').dataset.avatarId==='sarnai','Cancel keeps the current game avatar');
+  doc.querySelector('#new-match').click();doc.querySelector('#new-confirm').click();await tick();
+  assert(doc.querySelector('#self-avatar-chip').dataset.avatarId==='oyu','New game accepts the new choice');
+  const actor=doc.querySelector('.room-actor');actor.src='missing-avatar-qa.webp';await waitFor(()=>actor.dataset.failed==='true');
+  assert(actor.hidden&&doc.querySelector('.seat-1 .avatar-fallback'),'Missing character image falls back to seat portrait');
+  const portrait=doc.querySelector('#self-avatar-chip img');portrait.src='missing-portrait-qa.webp';await waitFor(()=>portrait.hidden);
+  assert(portrait.parentElement.classList.contains('image-failed'),'Missing portrait has a visible initial fallback');
+  const html=await (await fetch(base+'practice.html')).text();
+  const ready=loaded();frame.srcdoc=html.replace('<head>',`<head><base href="${base}"><script>Object.defineProperty(window,'localStorage',{get(){throw Error('blocked storage')}});<\/script>`);await ready;
+  await waitFor(()=>frame.contentDocument.querySelector('#practice-avatar-picker input'));doc=frame.contentDocument;
+  await choose(doc,'practice-avatar-picker','anu');doc.querySelector('#start').click();await waitFor(()=>doc.body.classList.contains('has-match'));
+  assert(doc.querySelector('#self-avatar-chip').dataset.avatarId==='anu','Fresh game works with completely blocked browser storage');
+  status.textContent='PASS · '+output.textContent.split('\n').filter(Boolean).length+' checks';
+ }catch(e){status.textContent='FAIL · '+e.message;output.textContent+='FAIL '+e.stack;}
+ finally{if(saved===null)localStorage.removeItem('naiman-gar-practice-v1');else localStorage.setItem('naiman-gar-practice-v1',saved);if(pref===null)localStorage.removeItem('gar:avatar');else localStorage.setItem('gar:avatar',pref);}
+};
+async function gallery(portrait){
+ frame.hidden=true;const root=document.querySelector('#gallery');root.replaceChildren();root.style.gridTemplateColumns=portrait?'repeat(4,1fr)':'repeat(2,1fr)';status.textContent='Loading character matrix';output.textContent='';
+ for(const avatar of AVATARS){
+  const figure=document.createElement('figure'),caption=document.createElement('figcaption'),f=document.createElement('iframe');caption.textContent=avatar.name+' · all seven seats';f.title=caption.textContent;f.height=portrait?620:340;
+  f.srcdoc=`<!doctype html><base href="${base}"><style>html,body{margin:0;background:#14231c;width:100%;height:100%;overflow:hidden}.felt,#characters{position:absolute;inset:0}.room-scene{position:absolute;overflow:hidden}.room-photo{position:absolute;left:0;width:100%;object-fit:fill}.room-actor{position:absolute}.room-table-mask{position:absolute;inset:0;width:100%;height:100%;z-index:10}.table-center{position:absolute}.turn-hud{position:absolute;top:70%}.seat{position:absolute;transform:translate(-50%,-50%);font:11px system-ui;color:white;background:#173d33c0;border-radius:8px;text-align:center;padding:3px}</style><div class="felt"><div id="characters"></div><div class="table-center"><div id="highest"></div></div><div class="turn-hud"></div></div><script type="module">import {CharacterRoom} from './photographic-room.js?v=avatars1';const room=new CharacterRoom(document.querySelector('#characters'));room.update({avatars:Array(8).fill('${avatar.id}'),paused:true});<\/script>`;
+  figure.append(caption,f);root.append(figure);
+ }
+ await waitFor(()=>[...root.querySelectorAll('iframe')].every(f=>f.contentDocument?.querySelectorAll('.room-actor').length===7&&[...f.contentDocument.querySelectorAll('.room-actor')].every(i=>i.complete&&i.naturalWidth&&!i.hidden)));
+ assert(true,'All 49 character/seat combinations loaded, including duplicate avatars');status.textContent='PASS · 49 combinations · '+(portrait?'portrait':'wide');
+}
+document.querySelector('#wide').onclick=()=>gallery(false);document.querySelector('#portrait').onclick=()=>gallery(true);
+</script></html>

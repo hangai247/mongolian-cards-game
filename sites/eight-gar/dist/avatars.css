@@ -1,0 +1,75 @@
+.avatar-picker { border: 0; padding: 0; margin: 0; min-width: 0; color: #f5e5c5; }
+.avatar-picker legend { font-size: 15px; font-weight: 650; padding: 0; margin-bottom: 5px; }
+.ger-table .avatar-hint { font-size: 11px !important; line-height: 1.5; color: #c6d1c6; margin: 0 0 12px !important; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.avatar-option { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 6px 3px; border: 1px solid #bda57460; background: #061e1b80; border-radius: 12px; cursor: pointer; }
+.avatar-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.avatar-option:has(input:checked) { border-color: #edcc83; background: #376454; box-shadow: 0 0 0 2px #edcc8340; }
+.avatar-option:has(input:checked)::after { content: '✓'; position: absolute; right: 3px; top: 3px; border-radius: 50%; background: #efd08b; color: #173b30; font-size: 12px; width: 17px; height: 17px; text-align: center; }
+.avatar-option:has(input:focus-visible) { outline: 3px solid #9df1d7; outline-offset: 3px; }
+.avatar-option:has(input:disabled) { cursor: default; opacity: .65; }
+.avatar-option-name { font-size: 11px; margin-top: 4px; }
+.avatar-portrait { position: relative; display: inline-block; flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: #29463a; vertical-align: middle; }
+.avatar-portrait img { position: absolute; top: 0; left: -20%; width: 140%; max-width: none; height: auto; }
+.avatar-initial { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; color: #f4d398; }
+.avatar-portrait:not(.image-failed) .avatar-initial, .avatar-full-preview:not(.image-failed) .avatar-initial { visibility: hidden; }
+.avatar-preview { margin: 16px 0 0; text-align: center; border-radius: 16px; background: radial-gradient(ellipse at 50% 50%, #c49a4735, transparent 70%); }
+.avatar-full-preview { position: relative; display: block; height: 240px; width: 100%; overflow: hidden; }
+.avatar-full-preview img { width: 100%; height: 100%; object-fit: contain; mask-image: linear-gradient(#000 85%, transparent); }
+.avatar-preview figcaption { color: #e8d2a4; font-size: 13px; padding: 6px; }
+.avatar-feedback { margin: 8px 0 !important; color: #ffcca9 !important; font-size: 12px !important; }
+.avatar-feedback:empty { display: none; }
+#entry-avatar-picker { margin-top: 18px; }
+#lobby-avatar-picker { margin: 18px 0; }
+#lobby-avatar-picker .avatar-preview { display: none; }
+.seat-target .avatar-portrait { width: 36px; height: 36px; }
+.ger-table #self-seat .seat { width: 145px !important; padding-left: 6px; }
+.ger-table #self-seat .seat > .avatar { display: flex !important; width: 30px; height: 30px; background: none; flex: 0 0 30px; }
+.ger-table #self-seat .avatar-portrait { width: 30px; height: 30px; }
+.room-actor { position: absolute; object-fit: fill; max-width: none; pointer-events: none; }
+.room-table-mask { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+.room-actor[hidden], .room-table-mask[hidden] { display: none; }
+.ger-table .seat .avatar-fallback { display: flex !important; width: 30px; height: 30px; flex: 0 0 30px; }
+.avatar-fallback .avatar-portrait { width: 30px; height: 30px; }
+body.practice-table .welcome:has(#practice-avatar-picker) { overflow: auto; top: 100px; transform: translateX(-50%); max-height: calc(100dvh - 130px); }
+#practice-avatar-picker, #new-avatar-picker { display: grid; grid-template-columns: 1fr 130px; gap: 14px; margin: 20px 0; }
+#practice-avatar-picker .avatar-full-preview, #new-avatar-picker .avatar-full-preview { height: 180px; }
+#practice-avatar-picker .avatar-preview, #new-avatar-picker .avatar-preview { margin: 0; }
+@media (max-width: 700px) {
+  .lobby-home #lobby-entry .lobby-card-fan { display: none; }
+  .lobby-home #entry-avatar-preview .avatar-full-preview { height: 140px; }
+  .lobby-home #entry-avatar-preview .avatar-preview { margin-top: 10px; }
+  .ger-table.lobby-home .welcome.lobby { padding-top: 100px; }
+  .ger-table #self-seat .seat { width: 125px !important; }
+  #practice-avatar-picker, #new-avatar-picker { display: flex; flex-direction: column; }
+  #practice-avatar-picker .avatar-full-preview, #new-avatar-picker .avatar-full-preview { height: 120px; }
+}
+
+#lobby-entry .lobby-card-fan { display: none; }
+
+/* Leave room for the added picker without pushing the entrance below the fold. */
+@media (min-width: 701px) { .ger-table.lobby-home .welcome.lobby { padding-top: max(110px, 17svh); } }
+.lobby-home .lobby-backdrop::before { background-image: url('assets/ger-room-wide-v5.jpg'); }
+
+#self-avatar-chip { display: none; }
+.has-match #self-avatar-chip { position: absolute; top: 16px; left: 200px; display: flex; gap: 6px; align-items: center; background: #142924dd; padding: 4px 10px 4px 4px; border: 1px solid #c3aa7166; border-radius: 24px; font-size: 12px; color: #f5e5c5; }
+#self-avatar-chip .avatar-portrait { width: 28px; height: 28px; }
+@media (max-width: 700px) {
+  .has-match #self-avatar-chip { left: 125px; top: 19px; padding: 2px 6px 2px 2px; gap: 4px; font-size: 11px; }
+  #self-avatar-chip .avatar-portrait { width: 24px; height: 24px; }
+  .ger-table .seat .seat-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (min-width: 361px) and (max-width: 700px) { .has-match #self-avatar-chip { left: 140px; } }
+@media (max-width: 360px) {
+  .ger-table.has-match .brand { font-size: 21px; gap: 5px; }
+  .ger-table.has-match .brand-mark { width: 28px; height: 28px; }
+  .has-match #self-avatar-chip { left: 103px; }
+}
+/* Keep name, code and joining actions together above a phone keyboard. */
+.lobby-keyboard #entry-avatar-picker { margin-top: 10px; }
+.lobby-keyboard .avatar-picker legend { font-size: 12px; }
+.lobby-keyboard .avatar-hint { display: none; }
+.lobby-keyboard .avatar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.lobby-keyboard .avatar-option { min-height: 48px; padding: 4px 1px; border-radius: 8px; }
+.lobby-keyboard .avatar-option .avatar-portrait { width: 26px; height: 26px; }
+.lobby-keyboard .avatar-option-name { font-size: 9px; }

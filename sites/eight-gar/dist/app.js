@@ -1,3 +1,4 @@
+import { mountLobbyViewport } from './lobby-entry.js?v=lobby1';
 import { controlIcon, setActionButton } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
 import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText, seatName } from './locale-mn.js';
@@ -14,7 +15,16 @@ import * as net from './net.js';
 import { createVoice } from './voice.js';
 import { createOnlineSignalControls } from './online-signals.js';
 
+import { mountAvatarPicker, rememberedAvatar, rememberAvatar, avatarImage, renderSelfAvatar } from './avatar-picker.js';
+
 const $ = id => document.getElementById(id);
+mountLobbyViewport();
+const entryPicker = mountAvatarPicker($('entry-avatar-picker'), { value: rememberedAvatar(), previewHost: $('entry-avatar-preview'), onChange: rememberAvatar });
+const lobbyPicker = mountAvatarPicker($('lobby-avatar-picker'), { onChange: async avatarId => {
+  if (!client || !connected || room?.status !== 'lobby') throw new Error('Дүрийг зөвхөн хүлээлгийн өрөөнд өөрчилнө.');
+  try { await client.request('room:setAvatar', { avatarId }); rememberAvatar(avatarId); entryPicker.setValue(avatarId); }
+  catch (error) { throw new Error(errorText(error)); }
+} });
 const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null || confirmPending || !connected; } });
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const NAME_KEY = 'gar:name', SORT_KEY = 'gar:byRank';
@@ -36,7 +46,7 @@ let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
 const signalControls = createOnlineSignalControls({ container: document.querySelector('.hand-zone'), onError: toast });
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=ger3.2').then(({ CharacterRoom }) => {
+import('./photographic-room.js?v=avatars1').then(({ CharacterRoom }) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
@@ -146,6 +156,7 @@ function seatStatus(sceneArg, index, motion, count, active, winning) {
 function render(sceneArg = scene, motion = null) {
   document.body.classList.toggle('has-match', !!sceneArg);
   document.dispatchEvent(new CustomEvent('game-activity', { detail: { active: ['choosing-leader', 'playing'].includes(sceneArg?.phase) } }));
+  renderSelfAvatar(seatInfo(0)?.avatarId);
   $('welcome').hidden = !!sceneArg;
   $('table-stats').hidden = !sceneArg;
   $('new-match').hidden = !session;
@@ -172,7 +183,8 @@ function render(sceneArg = scene, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}${offline ? ', холболтгүй' : ''}`);
     const mic = micBadge(info, index);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(info?.kind === 'bot' ? names[index].replace(/\s*\(компьютер\)$/, '') : names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
+    if (index === 0 && info?.kind !== 'empty') seat.querySelector('.avatar').replaceChildren(avatarImage(info?.avatarId));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${names[index]} · ${shownCount} далд хөзөртэй`);
@@ -186,7 +198,7 @@ function render(sceneArg = scene, motion = null) {
     }
     $(index === 0 ? 'self-seat' : 'seats').append(seat);
   }
-  characterRoom.update({ handCounts: sceneArg?.hands.map(hand => hand.length) ?? Array(8).fill(0), phase: sceneArg?.phase, turn: sceneArg?.turn, winner: sceneArg?.winner, paused: false }, motion);
+  characterRoom.update({ avatars: Array.from({ length: 8 }, (_, index) => { const info = seatInfo(index); return info && info.kind !== 'empty' ? info.avatarId : null; }), handCounts: sceneArg?.hands.map(hand => hand.length) ?? Array(8).fill(0), phase: sceneArg?.phase, turn: sceneArg?.turn, winner: sceneArg?.winner, paused: false }, motion);
   $('highest').replaceChildren();
   $('pile-key').hidden = !sceneArg?.table.pile.length;
   if (sceneArg?.table.pile.length) {
@@ -301,48 +313,69 @@ function setEntryMode(code) {
   $('lobby-code').value = code;
   $('lobby-intro').textContent = joining
     ? 'Таныг ширээнд урьсан байна. Нэрээ оруулаад суудалдаа нэгдээрэй. Найман суудал, хоёр баг, нэг дуут суваг.'
-    : 'Найман суудал. Хоёр баг. Нэг дуут суваг. Ширээ нээж долоон найздаа холбоосыг илгээгээрэй. Эсвэл сул суудлыг компьютер тоглогчоор дүүргэж болно.';
-  $('lobby-code-caption').textContent = joining ? 'Ширээний код' : 'Эсвэл ширээний кодоор нэгдэх';
+    : 'Найман суудал. Хоёр баг. Нэг ширээ.';
+  $('lobby-code-caption').textContent = joining ? 'Ширээний код' : 'эсвэл кодоор нэгдэх';
   $('join').className = joining ? 'button light' : 'quiet-button';
   $('join').innerHTML = joining ? 'Ширээнд нэгдэх <span aria-hidden="true">→</span>' : 'Нэгдэх';
 }
 function renderLobby() {
   const inRoom = !!session && !!room;
+  const waiting = inRoom && !document.body.classList.contains('has-match');
+  if (document.body.classList.contains('lobby-waiting') !== waiting) $('welcome').scrollTop = 0;
+  document.body.classList.toggle('lobby-waiting', waiting);
+  document.body.classList.toggle('lobby-home', !inRoom);
   $('lobby-entry').hidden = inRoom;
+  document.dispatchEvent(new Event('lobby-state-change'));
   $('lobby-room').hidden = !inRoom;
+  lobbyPicker.setDisabled(!connected || room?.status !== 'lobby');
   if (!inRoom) return;
+  lobbyPicker.setValue(room.seats[me]?.avatarId);
   $('lobby-code-label').textContent = room.code;
   $('share-link').value = `${location.origin}/r/${room.code}`;
   const humans = room.seats.filter(s => s.kind === 'human').length, filled = room.seats.filter(s => s.kind !== 'empty').length;
-  $('lobby-title').textContent = room.status === 'lobby' ? (filled === 8 ? 'Ширээ дүүрлээ.' : 'Тоглогчид цуглаж байна') : 'Ширээнд буцаж орж байна…';
+  $('lobby-title').textContent = room.status === 'lobby' ? (filled === 8 ? 'Ширээ дүүрлээ.' : 'Найзуудаа хүлээж байна') : 'Ширээнд буцаж орж байна…';
+  $('room-filled').textContent = String(filled);
+  $('room-progress-fill').style.width = `${filled / 8 * 100}%`;
+  $('lobby-room').classList.toggle('room-ready', filled === 8);
   $('host-actions').hidden = !room.you.isHost;
   $('start-game').disabled = filled !== 8 || !connected;
   $('fill-bots').disabled = filled === 8 || !connected;
   $('lobby-status').textContent = room.you.isHost
     ? (filled === 8 ? 'Бүгд суудалдаа орлоо. Бэлэн бол хөзрөө тараагаарай.' : `${humans} тоглогч суусан · ${8 - filled} сул суудал. Компьютероор дүүргэх эсвэл найзуудаа хүлээгээрэй.`)
     : (filled === 8 ? 'Ширээ нээсэн хүн хөзөр тараахыг хүлээж байна.' : `${humans} тоглогч суусан. Найман суудал дүүрмэгц ширээ нээсэн хүн хөзөр тараана.`);
-  const groups = $('seat-list'); groups.replaceChildren();
+  const groups = $('seat-list');
+  const focused = groups.contains(document.activeElement) ? document.activeElement : null;
+  const focusSeat = focused?.dataset.seat, focusAction = focused?.dataset.action;
+  groups.replaceChildren();
   const switchTarget = switchTeamTarget(room.seats, me);
   for (const group of teamGroups(room.seats, me)) {
     const section = document.createElement('section');
     section.className = `team-group ${group.ours ? 'ours' : 'theirs'}`;
     const heading = document.createElement('h3'); heading.className = 'team-heading';
     const seatNumbers = group.seats.map(info => info.seat + 1).join(' · ');
-    heading.innerHTML = `<span>${group.ours ? 'Танай баг' : 'Эсрэг баг'}</span><small>${seatNumbers}-р суудал</small>`;
+    const occupied = group.seats.filter(info => info.kind !== 'empty').length;
+    heading.innerHTML = `<span>${group.ours ? 'Танай баг' : 'Эсрэг баг'}</span><b class="team-count">${occupied}/4</b><small>${seatNumbers}-р суудал</small>`;
     section.append(heading);
     if (!group.ours) {
       // Teams follow seat parity, so switching team is a move into the other team's first open seat.
       const button = document.createElement('button'); button.className = 'quiet-button switch-team'; button.type = 'button';
       button.textContent = 'Энэ багт шилжих';
+      button.dataset.action = 'switch';
       button.disabled = switchTarget === null || !connected || room.status !== 'lobby';
       button.title = switchTarget === null ? 'Эсрэг багт сул суудал алга.' : `${switchTarget + 1}-р суудалд шилжинэ`;
       button.addEventListener('click', () => { if (switchTarget !== null) lobbyRequest('room:move', { seat: switchTarget }); });
       heading.append(button);
+    } else {
+      const label = document.createElement('span'); label.className = 'team-current'; label.textContent = '✓ Та энэ багт'; heading.append(label);
     }
     const list = document.createElement('ul'); list.className = 'seat-list'; list.setAttribute('aria-label', group.ours ? 'Танай багийн суудлууд' : 'Эсрэг багийн суудлууд');
     for (const info of group.seats) list.append(seatRow(info, group.ours));
     section.append(list);
     groups.append(section);
+  }
+  if (focusAction) {
+    const replacement = [...groups.querySelectorAll('button[data-action]')].find(el => el.dataset.action === focusAction && el.dataset.seat === focusSeat);
+    replacement?.focus({ preventScroll: true });
   }
 }
 function seatRow(info, ours) {
@@ -354,12 +387,25 @@ function seatRow(info, ours) {
   row.dataset.seat = info.seat; row.dataset.display = display;
   const who = info.kind === 'empty' ? 'Сул суудал' : mine ? `${info.name} (та)` : seatName(info);
   const tags = [info.isHost ? 'Зохион байгуулагч' : '', info.kind === 'human' ? `<span class="${info.connected ? 'online' : 'offline'}">${info.connected ? 'Холбогдсон' : 'Холболтгүй'}</span>` : '', micBadge(info, display)].filter(Boolean).join(' · ');
-  row.innerHTML = `<span class="seat-no">${info.seat + 1}</span><span class="seat-who">${escapeHtml(who)}</span><span class="seat-tags">${tags}</span>`;
-  if (clickable) { row.setAttribute('role', 'button'); row.tabIndex = 0; row.setAttribute('aria-label', `${info.seat + 1}-р суудалд шилжих`); row.addEventListener('click', () => lobbyRequest('room:move', { seat: info.seat })); row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lobbyRequest('room:move', { seat: info.seat }); } }); }
+  // Separate native buttons keep seat movement and host bot controls independent, including Enter/Space.
+  const target = document.createElement(clickable ? 'button' : 'div');
+  target.className = 'seat-target';
+  target.innerHTML = `<span class="seat-no">${info.seat + 1}</span><span class="seat-details"><span class="seat-who">${escapeHtml(who)}</span><span class="seat-tags">${tags}</span></span>`;
+  if (info.kind !== 'empty') target.querySelector('.seat-no').replaceWith(avatarImage(info.avatarId));
+  if (clickable) {
+    target.type = 'button'; target.dataset.action = 'move'; target.dataset.seat = String(info.seat);
+    target.disabled = !connected || room.status !== 'lobby';
+    target.setAttribute('aria-label', `${info.seat + 1}-р суудалд шилжих`);
+    target.addEventListener('click', () => lobbyRequest('room:move', { seat: info.seat }));
+  }
+  row.append(target);
   if (room.you.isHost && isOpenSeat(info)) {
-    const button = document.createElement('button'); button.className = 'text-button'; button.type = 'button';
+    const button = document.createElement('button'); button.className = 'text-button seat-bot-action'; button.type = 'button';
+    button.dataset.action = 'bot'; button.dataset.seat = String(info.seat);
+    button.disabled = !connected || room.status !== 'lobby';
     button.textContent = info.kind === 'empty' ? '+ Компьютер' : 'Хасах';
-    button.addEventListener('click', e => { e.stopPropagation(); lobbyRequest('room:setBot', { seat: info.seat, bot: info.kind === 'empty' }); });
+    button.setAttribute('aria-label', `${info.seat + 1}-р суудал: ${info.kind === 'empty' ? 'компьютер нэмэх' : 'компьютер хасах'}`);
+    button.addEventListener('click', () => lobbyRequest('room:setBot', { seat: info.seat, bot: info.kind === 'empty' }));
     row.append(button);
   }
   return row;
@@ -368,21 +414,29 @@ async function lobbyRequest(event, payload = {}) {
   if (!client) return;
   try { await client.request(event, payload); } catch (error) { toast(errorText(error)); }
 }
-function showLobbyError(message) { $('lobby-error').textContent = message || ''; }
+function showLobbyError(message, field) {
+  $('lobby-error').textContent = message || '';
+  for (const id of ['lobby-name', 'lobby-code']) $(id).setAttribute('aria-invalid', String(id === field));
+  if (message) requestAnimationFrame(() => $('lobby-error').scrollIntoView({ block: 'nearest' }));
+}
 async function createOrJoin(kind) {
+  if ($('create').disabled || $('join').disabled) return;
   const name = $('lobby-name').value.trim();
-  if (!name) { showLobbyError('Эхлээд нэрээ оруулна уу.'); $('lobby-name').focus(); return; }
+  if (!entryPicker.value) { entryPicker.requireChoice(); return; }
+  if (!name) { showLobbyError('Эхлээд нэрээ оруулна уу.', 'lobby-name'); $('lobby-name').focus(); return; }
   store(NAME_KEY, name);
   const code = $('lobby-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (kind === 'join' && code.length < 4) { showLobbyError('Зургаан тэмдэгттэй ширээний кодыг оруулна уу.'); $('lobby-code').focus(); return; }
+  if (kind === 'join' && code.length !== 6) { showLobbyError('Зургаан тэмдэгттэй ширээний кодыг оруулна уу.', 'lobby-code'); $('lobby-code').focus(); return; }
   for (const id of ['create', 'join']) $(id).disabled = true;
+  $('lobby-entry').setAttribute('aria-busy', 'true');
   showLobbyError('');
   try {
-    const result = kind === 'create' ? await net.createRoom(name) : await net.joinRoom(code, name);
+    const result = kind === 'create' ? await net.createRoom(name, entryPicker.value) : await net.joinRoom(code, name, entryPicker.value);
+    if ($('lobby-entry').contains(document.activeElement)) document.activeElement.blur();
     enterRoom(result);
   } catch (error) {
     showLobbyError(errorText(error));
-  } finally { for (const id of ['create', 'join']) $(id).disabled = false; }
+  } finally { for (const id of ['create', 'join']) $(id).disabled = false; $('lobby-entry').removeAttribute('aria-busy'); }
 }
 
 // ---- Room lifecycle ----
@@ -431,6 +485,7 @@ function updateNames() {
 }
 function onRoomState(payload) {
   room = payload; me = payload.you.seat; updateNames();
+  if (room.seats[me]?.avatarId) { rememberAvatar(room.seats[me].avatarId); entryPicker.setValue(room.seats[me].avatarId); }
   maybeJoinVoice();
   if (payload.game) {
     deadline = payload.game.deadline; timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
@@ -618,8 +673,8 @@ for (const button of document.querySelectorAll('[data-close]')) button.addEventL
 $('pile-open').addEventListener('click', () => { if (!scene) return; $('pile-cards').replaceChildren(...scene.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
 $('create').addEventListener('click', () => createOrJoin('create'));
 $('join').addEventListener('click', () => createOrJoin('join'));
-$('lobby-code').addEventListener('keydown', e => { if (e.key === 'Enter') createOrJoin('join'); });
-$('lobby-name').addEventListener('keydown', e => { if (e.key === 'Enter') createOrJoin($('lobby-code').value.trim() ? 'join' : 'create'); });
+$('lobby-code').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); createOrJoin('join'); } });
+$('lobby-name').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); createOrJoin($('lobby-code').value.trim() ? 'join' : 'create'); } });
 $('fill-bots').addEventListener('click', () => lobbyRequest('room:fillBots'));
 $('start-game').addEventListener('click', () => lobbyRequest('room:start'));
 $('share-copy').addEventListener('click', () => copyText($('share-link').value, 'Ширээний холбоос'));
@@ -648,6 +703,9 @@ $('lobby-name').value = read(NAME_KEY) || '';
   else {
     setEntryMode(code);
     render();
-    ($('lobby-name').value ? (code ? $('join') : $('create')) : $('lobby-name')).focus({ preventScroll: true });
+    // Do not open a software keyboard before a phone user chooses a field.
+    if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      ($('lobby-name').value ? (code ? $('join') : $('create')) : $('lobby-name')).focus({ preventScroll: true });
+    }
   }
 }

@@ -1,0 +1,70 @@
+<!doctype html><meta charset="utf-8"><title>Lobby layout checks</title>
+<style>body{margin:0;font:14px system-ui;background:#eee}header{padding:12px}iframe{display:block;border:0;margin:0 auto}pre{max-height:170px;overflow:auto;padding:12px;white-space:pre-wrap}</style>
+<header><button id="run">Run lobby checks</button> <span id="status">Ready — disposable local server only</span></header><pre id="output"></pre><iframe id="game" title="Lobby preview" width="390" height="844" src="/"></iframe>
+<script type="module">
+const frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const until=async fn=>{for(let i=0;i<160;i++){if(fn())return;await wait(30);}throw Error('Timed out');};
+const assert=(v,m)=>{if(!v)throw Error(m);output.textContent+='✓ '+m+'\n';};
+const size=async(w,h)=>{frame.width=w;frame.height=h;await wait(100);};
+function visible(doc,node,label){const b=node.getBoundingClientRect(),v=doc.querySelector('#welcome').getBoundingClientRect();assert(b.left>=0&&b.right<=Number(frame.width)+1&&b.top>=v.top&&b.bottom<=v.bottom+1,label+' reachable');const hit=doc.elementFromPoint(b.x+b.width/2,b.y+b.height/2);assert(node.contains(hit),label+' unobstructed');}
+document.querySelector('#run').onclick=async()=>{
+ try{
+ status.textContent='Running';output.textContent='';let d=frame.contentDocument;
+ await until(()=>d.querySelector('#create')&&!d.querySelector('#create').disabled);
+ d.activeElement?.blur();
+ for(const [w,h] of [[320,568],[390,844],[430,932],[700,900],[844,390],[1440,900]]){
+ await size(w,h);
+ assert(d.documentElement.scrollWidth<=w+1,`${w}×${h}: no horizontal overflow`);
+ assert(getComputedStyle(d.querySelector('.scoreboard')).display==='none',`${w}×${h}: pre-game score hidden`);
+ for(const id of ['lobby-name','create','lobby-code','join']){
+ const el=d.getElementById(id);el.scrollIntoView({block:'center'});await wait(20);
+ const b=el.getBoundingClientRect();assert(b.height>=48,`${w}×${h}: ${id} touch target`);visible(d,el,`${w}×${h}: ${id}`);
+ }
+ const practice=d.querySelector('.lobby-practice');practice.scrollIntoView({block:'center'});await wait(20);visible(d,practice,`${w}×${h}: practice`);
+ }
+ await size(390,844);d.getElementById('lobby-name').focus();await wait(30);await size(390,480);
+ assert(d.body.classList.contains('lobby-keyboard'),'keyboard collapse');
+ for(const id of ['lobby-name','create','lobby-code','join'])visible(d,d.getElementById(id),'Keyboard '+id);
+ d.getElementById('join').focus();await wait(30);assert(d.body.classList.contains('lobby-keyboard'),'button focus preserves compact layout');
+ d.querySelector('#entry-avatar-picker input[value=temu]').click();await wait(20);
+ d.getElementById('lobby-name').value='';d.getElementById('create').click();await wait(50);
+ assert(d.getElementById('lobby-name').getAttribute('aria-invalid')==='true','missing name gets accessible error');
+ d.getElementById('lobby-name').value='Lobby QA';d.getElementById('lobby-code').value='AB';d.getElementById('join').click();await wait(50);
+ assert(d.getElementById('lobby-code').getAttribute('aria-invalid')==='true','short code gets accessible error');
+ await size(390,260);const practice=d.querySelector('.lobby-practice');practice.scrollIntoView({block:'center'});await wait(30);visible(d,practice,'Very short keyboard practice');
+ await size(390,480);d.getElementById('lobby-code').value='';d.getElementById('create').click();
+ await until(()=>!d.getElementById('lobby-room').hidden);
+ assert(!d.body.classList.contains('lobby-home')&&!d.body.classList.contains('lobby-keyboard'),'successful create exits entrance and keyboard layout');
+ assert(d.body.classList.contains('lobby-waiting'),'waiting room has its own presentation');
+ assert(d.querySelectorAll('.seat-row').length===8,'all eight seats are rendered');
+ for(const [w,h] of [[320,568],[390,844],[700,900],[844,390],[1440,900]]){
+ await size(w,h);assert(d.documentElement.scrollWidth<=w+1,`${w}×${h}: waiting room no horizontal overflow`);
+ for(const selector of ['#share-copy','.switch-team','button.seat-target','.seat-bot-action','#fill-bots','#lobby-leave']){
+ const el=d.querySelector(selector);el.scrollIntoView({block:'center'});await wait(40);
+ assert(el.getBoundingClientRect().height>=44,`${w}×${h}: ${selector} has a touch target`);visible(d,el,`${w}×${h}: ${selector}`);
+ }
+ }
+ const originalSeat=d.querySelector('.seat-row.me').dataset.seat;
+ const add=d.querySelector('.seat-bot-action');const botSeat=add.dataset.seat;add.focus();add.click();
+ await until(()=>d.querySelector(`.seat-row[data-seat="${botSeat}"]`).classList.contains('bot'));
+ assert(d.querySelector('.seat-row.me').dataset.seat===originalSeat,'adding a computer does not move the player');
+ assert(d.activeElement.dataset.action==='bot'&&d.activeElement.dataset.seat===botSeat,'focus survives roster refresh');
+ assert(d.getElementById('room-filled').textContent==='2','occupancy updates after bot addition');
+ d.querySelector(`.seat-bot-action[data-seat="${botSeat}"]`).click();await until(()=>d.getElementById('room-filled').textContent==='1');
+ d.querySelector('.switch-team').click();await until(()=>d.querySelector('.seat-row.me').dataset.seat!==originalSeat);
+ assert(Number(d.querySelector('.seat-row.me').dataset.seat)%2!==Number(originalSeat)%2,'switch team moves to opposite parity');
+ d.querySelector(`button.seat-target[data-seat="${originalSeat}"]`).click();await until(()=>d.querySelector('.seat-row.me').dataset.seat===originalSeat);
+ assert(d.getElementById('start-game').disabled,'deal stays disabled until all seats are filled');
+ await size(390,844);d.getElementById('fill-bots').click();await until(()=>!d.getElementById('start-game').disabled);d.getElementById('start-game').click();await until(()=>d.body.classList.contains('has-match'));
+ assert(getComputedStyle(d.querySelector('.scoreboard')).display!=='none','score returns after dealing');
+ // A fresh server fixture has no saved browser session: exercise invitation entry and join.
+ const fixture=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Invitation host'})}).then(r=>r.json());
+ frame.src='/r/'+fixture.code;await until(()=>frame.contentDocument!==d&&frame.contentDocument.querySelector('#lobby-entry.joining'));d=frame.contentDocument;
+ assert(d.querySelector('#lobby-code').value===fixture.code,'invitation code preserved');
+ assert(getComputedStyle(d.querySelector('.lobby-actions')).display==='none','invitation offers join only');
+ d.getElementById('lobby-name').value='Invitation guest';d.getElementById('join').click();await until(()=>!d.getElementById('lobby-room').hidden);assert(true,'invitation join reaches room');assert(d.getElementById('host-actions').hidden&&!d.querySelector('.seat-bot-action'),'guest cannot see host-only controls');
+ status.textContent='All lobby checks passed';
+ }catch(e){status.textContent='Failed';output.textContent+='✗ '+e.stack;}
+};
+</script>

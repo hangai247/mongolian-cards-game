@@ -1,4 +1,5 @@
 /** Everything a client may see. Hands other than the viewer's never pass through here. */
+import { normalizeAvatar, botAvatar } from 'mongolian-eight-gar-engine/avatars';
 import { TEAMS, viewForPlayer, type Event as EngineEvent } from 'mongolian-eight-gar-engine';
 import type { Timing } from '../config.js';
 import type { ClientEvent, GameInfo, PublicRoomInfo, RoomStatePayload, SeatInfo } from '../protocol.js';
@@ -18,6 +19,7 @@ export function seatInfos(snapshot: RoomSnapshot): SeatInfo[] {
     return {
       seat, kind: slot.kind, team: TEAMS[seat] ?? 0,
       name: player?.name ?? (slot.kind === 'bot' ? botName(seat) : null),
+      avatarId: player || reserved ? normalizeAvatar((player ?? reserved)?.avatarId) : slot.kind === 'bot' ? botAvatar(seat) : null,
       playerId, connected: player?.connected ?? false,
       isHost: playerId !== null && playerId === snapshot.hostPlayerId,
       reservedForName: reserved?.name ?? null,
@@ -55,7 +57,7 @@ export function publicRoomInfo(snapshot: RoomSnapshot): PublicRoomInfo {
   const seats = seatInfos(snapshot);
   return {
     code: snapshot.code, status: snapshot.status,
-    seats: seats.map(({ seat, kind, name }) => ({ seat, kind, name })),
+    seats: seats.map(({ seat, kind, name, avatarId }) => ({ seat, kind, name, avatarId })),
     humanCount: seats.filter(seat => seat.kind === 'human').length,
   };
 }

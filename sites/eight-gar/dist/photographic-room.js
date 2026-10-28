@@ -1,14 +1,25 @@
 import { layoutTablePile } from './viewport-table.js?v=ger3';
-import { roomLayout } from './room-layout.js?v=ger3.2';
+import { roomLayout } from './room-layout.js?v=avatars1';
+import { AVATARS, normalizeAvatar } from './rules/avatars.js';
+import { avatarImage } from './avatar-picker.js';
 
-/** A coherent generated room with live public seat labels and card fans. No WebGL is required. */
+/** Still character cutouts over a people-free room. Only public avatar IDs enter this renderer. */
 export class CharacterRoom {
   constructor(host) {
     this.host=host; host.classList.add('ready'); this.snapshot=null; this.animations=[];
     this.reduced=matchMedia('(prefers-reduced-motion: reduce)');
     this.stage=document.createElement('div');this.stage.className='room-scene';
     this.image=new Image();this.image.alt='';this.image.className='room-photo';this.image.decoding='async';
-    this.stage.append(this.image);host.replaceChildren(this.stage);host.dataset.renderer='photographic-scene';
+    this.actors=Array.from({length:7},(_,index)=>{
+      const img=new Image();img.alt='';img.className='room-actor';img.dataset.seat=index+1;img.hidden=true;img.decoding='async';
+      img.addEventListener('error',()=>{img.hidden=true;img.dataset.failed='true';this.layoutSeats();});
+      img.addEventListener('load',()=>{delete img.dataset.failed;img.hidden=!this.snapshot?.avatars?.[index+1];this.layoutSeats();});
+      return img;
+    });
+    this.tableMask=new Image();this.tableMask.alt='';this.tableMask.className='room-table-mask';
+    this.tableMask.addEventListener('error',()=>{this.tableMask.hidden=true;});
+    this.tableMask.addEventListener('load',()=>{this.tableMask.hidden=false;});
+    this.stage.append(this.image,...this.actors,this.tableMask);host.replaceChildren(this.stage);host.dataset.renderer='photographic-scene';
     this.image.addEventListener('error',()=>{host.dataset.renderer='fallback';this.stage.classList.add('art-unavailable');});
     this.image.addEventListener('load',()=>{host.dataset.renderer='photographic-scene';this.image.style.visibility='';this.stage.classList.remove('art-unavailable');});
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(host);
@@ -22,7 +33,12 @@ export class CharacterRoom {
     this.layout=roomLayout(width,height);const p=this.layout;
     Object.assign(this.stage.style,{left:`${p.x}px`,top:`${p.y}px`,width:`${p.width}px`,height:`${p.height}px`});
     Object.assign(this.image.style,{top:`${p.imageTop}px`,height:`${p.imageHeight}px`});
-    if(this.image.getAttribute('src')!==p.image){this.image.style.visibility='hidden';this.image.src=p.image;}
+    if(this.image.getAttribute('src')!==p.image){this.image.style.visibility='hidden';this.image.src=p.image;this.tableMask.hidden=true;this.tableMask.src=p.image;}
+    this.tableMask.style.clipPath=p.tableMask;
+    for(const actor of p.actors){
+      const img=this.actors[actor.seat-1];
+      Object.assign(img.style,{left:`${actor.x}px`,top:`${actor.y}px`,width:`${actor.width}px`,height:`${actor.height}px`,zIndex:actor.z});
+    }
     const felt=this.host.closest('.felt');felt.classList.toggle('portrait-scene',p.portrait);
     felt.style.setProperty('--room-image',`url('${p.image}')`);
     const center=felt.querySelector('.table-center');
@@ -55,6 +71,11 @@ export class CharacterRoom {
     const ordered=this.layout.compactLabels?[4,3,5,2,6,1,7,0].map(seat=>this.layout.seats[seat]):this.layout.seats;
     for(const p of ordered){
       const node=document.querySelector(`.seat-${p.seat}`);if(!node)continue;
+      if(p.seat>0){
+        const failed=this.actors[p.seat-1].dataset.failed==='true'&&!!this.snapshot?.avatars?.[p.seat];
+        const avatar=node.querySelector('.avatar');
+        if(avatar){avatar.classList.toggle('avatar-fallback',failed);if(failed&&!avatar.querySelector('.avatar-portrait'))avatar.replaceChildren(avatarImage(this.snapshot.avatars[p.seat]));}
+      }
       Object.assign(node.style,{left:`${p.x}px`,top:`${p.y}px`,width:`${p.width}px`});
       if(this.layout.compactLabels&&p.seat!==0){
         const height=node.getBoundingClientRect().height;
@@ -72,6 +93,14 @@ export class CharacterRoom {
   }
   update(snapshot,motion=null) {
     this.snapshot=snapshot;this.motion=motion;
+    this.actors.forEach((img,index)=>{
+      const id=snapshot.avatars?.[index+1];
+      img.hidden=!id||img.dataset.failed==='true';
+      if(id&&img.dataset.avatarId!==normalizeAvatar(id)){
+        img.dataset.avatarId=normalizeAvatar(id);delete img.dataset.failed;
+        img.src=AVATARS.find(avatar=>avatar.id===normalizeAvatar(id)).image;img.hidden=false;
+      }
+    });
     if(snapshot.paused||snapshot.motionEnabled===false)this.clearReaction();
     this.resize();
   }
