@@ -428,7 +428,6 @@ function showLobbyError(message, field) {
 async function createOrJoin(kind) {
   if ($('create').disabled || $('join').disabled) return;
   const name = $('lobby-name').value.trim();
-  if (!entryPicker.value) { entryPicker.requireChoice(); return; }
   if (!name) { showLobbyError('Эхлээд нэрээ оруулна уу.', 'lobby-name'); $('lobby-name').focus(); return; }
   store(NAME_KEY, name);
   const code = $('lobby-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');

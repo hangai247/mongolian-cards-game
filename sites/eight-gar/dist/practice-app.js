@@ -361,7 +361,6 @@ for (const button of document.querySelectorAll('[data-close]')) button.addEventL
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
 function startWithPicker(picker) {
-  if (!picker.value) { picker.requireChoice(); return false; }
   practiceAvatar = picker.value; rememberAvatar(practiceAvatar); startMatch(); return true;
 }
 $('start').addEventListener('click', () => startWithPicker(practicePicker));

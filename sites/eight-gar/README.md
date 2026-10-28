@@ -104,7 +104,7 @@ Waiting-room refinement: `dist/lobby-room.css` carries the entrance palette into
 
 ### Selectable avatars
 
-Online and practice players can choose one of seven still characters. The browser remembers the choice; online rooms permit changes only while waiting. Characters are now separate layers over people-free v5 room artwork, with a persistent local portrait. See [avatar behavior, verification and artwork prompts](docs/selectable-avatars.md). The root build now also copies the shared avatar catalog; the server applies migration `002_player_avatars.sql` at startup.
+Online and practice players can choose one of seven still characters; a character is always preselected (the remembered one, otherwise a random one), so play can start without choosing. The browser remembers the choice; online rooms permit changes only while waiting. Characters are now separate layers over people-free v5 room artwork, with a persistent local portrait. See [avatar behavior, verification and artwork prompts](docs/selectable-avatars.md). The root build now also copies the shared avatar catalog; the server applies migration `002_player_avatars.sql` at startup.
 
 ### Card depth and movement
 
