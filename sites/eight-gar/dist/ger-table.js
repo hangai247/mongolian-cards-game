@@ -16,12 +16,16 @@ const hud=document.createElement('div');hud.className='turn-hud';
 const ring=document.createElement('span');ring.className='turn-ring';ring.setAttribute('aria-hidden','true');
 const text=document.createElement('div');text.className='turn-hud-copy';
 text.append($('turn-label'));if($('turn-timer'))text.append($('turn-timer'));
-const guidance=$('guidance');text.append(guidance);hud.append(ring,text);$('felt').append(hud);
+const guidance=$('guidance');text.append(guidance,$('live-move'));hud.append(ring,text);$('felt').append(hud);
 const utility=document.createElement('div');utility.className='table-utility';
 const selection=document.createElement('span');selection.id='selection-count';selection.setAttribute('aria-live','polite');
 // Keep set declarations in the main controls so they are discoverable on phones.
 const signalSlot=document.createElement('div');signalSlot.className='signal-slot';
 utility.append(signalSlot,selection,$('sort'));
+// A "?" beside the signal buttons opens the rules at the team-signal section.
+const signalHelp=document.createElement('button');signalHelp.type='button';signalHelp.className='icon-button signal-help';signalHelp.innerHTML=controlIcon('help');signalHelp.setAttribute('aria-label','Багийн дохионы тухай');signalHelp.title='Багийн дохионы тухай';
+signalHelp.onclick=()=>{$('rules-open').click();requestAnimationFrame(()=>$('rules-signals')?.scrollIntoView({block:'start'}));};
+signalSlot.append(signalHelp);
 let explainButton;
 const defensePanel=$('defense-preview');
 if(defensePanel){

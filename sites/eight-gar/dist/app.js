@@ -7,7 +7,7 @@ import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
-import { RANKS, SUITS, JOKERS, applyAction, canLeadThree, canLeadFive } from './engine.js';
+import { RANKS, SUITS, JOKERS, applyAction } from './engine.js';
 import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
@@ -25,7 +25,13 @@ const lobbyPicker = mountAvatarPicker($('lobby-avatar-picker'), { onChange: asyn
   try { await client.request('room:setAvatar', { avatarId }); rememberAvatar(avatarId); entryPicker.setValue(avatarId); }
   catch (error) { throw new Error(errorText(error)); }
 } });
-const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null || confirmPending || !connected; } });
+const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
+// The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
+function renderConfirmOpener() {
+  const chosen = openerSelection.value;
+  $('confirm-opener').disabled = chosen === null || confirmPending || !connected;
+  $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${chosen === 0 ? 'Та' : names[chosen].replace(/\s*\(компьютер\)$/, '')} эхэлнэ · батлах →`;
+}
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const NAME_KEY = 'gar:name', SORT_KEY = 'gar:byRank';
 const ENGINE_EVENTS = new Set(['played', 'picked-up', 'refilled', 'table-slept']);
@@ -34,10 +40,12 @@ const ENGINE_EVENTS = new Set(['played', 'picked-up', 'refilled', 'table-slept']
 let session = null, client = null, room = null, latestView = null, me = 0, names = defaultNames(), connected = false;
 // Rendered scene (display coordinates) and animation state
 let scene = null, selected = new Set(), liveMove = '', byRank = false, toastTimer = null;
-let animating = false, motionController = null, motionEpoch = 0, motionText = '', rosterDirty = false;
+let animating = false, motionController = null, motionEpoch = 0, rosterDirty = false;
 let pendingUpdates = [], processing = false;
 // Timers from the server (epoch ms on the server clock)
-let deadline = null, timerKind = null, reviewUntil = null;
+let deadline = null, deadlineSpan = null, timerKind = null, reviewUntil = null;
+// The server sends only the deadline, so countdown rings measure from the moment a new deadline arrives.
+function setDeadline(value) { if (value !== deadline) deadlineSpan = value === null ? null : Math.max(1000, value - serverNow()); deadline = value; }
 // Voice
 let voice = null, voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }, speakingIds = new Set(), voiceMembers = new Map();
 const MIC_KEY = 'gar:mic';
@@ -128,19 +136,15 @@ function renderActions() {
   document.body.dataset.selection = String(selected.size);
   document.body.classList.toggle('my-turn', !!active);
   setActionButton($('pickup'), scene?.table.pile.length ? `${scene.table.pile.length} хөзөр авах` : 'Авах', 'cards');
-  if (animating) $('guidance').textContent = motionText;
+  if (animating) $('guidance').textContent = '';
   else if (!session) $('guidance').textContent = 'Хөзрөө харахын тулд ширээ нээх эсвэл ширээнд нэгдээрэй.';
   else if (!scene) $('guidance').textContent = 'Тоглогчдыг хүлээж байна. Ширээ нээсэн хүн тоглолт эхлүүлэхэд хөзөр тараана.';
   else if (!connected) $('guidance').textContent = 'Ширээнд дахин холбогдож байна…';
   else if (scene.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (scene.phase !== 'playing') $('guidance').textContent = scene.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
-  else if (scene.turn !== 0) $('guidance').textContent = `${names[scene.turn]} нүүдлээ сонгож байна…`;
-  else if (error) $('guidance').textContent = ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.';
-  else if (selected.size) $('guidance').textContent = 'Энэ нүүдэл зөв. Бэлэн бол тавиарай.';
-  else if (scene.table.highest.length) $('guidance').textContent = `${scene.table.highest.length} хөзрийг дарах эсвэл ширээний бүх хөзрийг аваарай.`;
-  else $('guidance').textContent = canLeadThree(scene)
-    ? `Та эхэлнэ. Нэг эсвэл гурван хөзөр${canLeadFive(scene) ? ', эсвэл хоёр хостой таван хөзөр' : ''} сонгоорой.`
-    : 'Нэг хөзрөөр эхэлнэ. Гурваас цөөн хөзөртэй тоглогч байна.';
+  // During play the capsule only explains an illegal selection; the seat highlight, clock and buttons say the rest.
+  else $('guidance').textContent = scene.turn === 0 && error ? ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.' : '';
+  $('guidance').hidden = !$('guidance').textContent;
   renderComputerMessage($('guidance'), $('guidance').textContent);
 }
 function seatStatus(sceneArg, index, motion, count, active, winning) {
@@ -283,10 +287,14 @@ function renderTimer() {
   if (!show) { lastTimerText = ''; return; }
   const left = Math.max(0, Math.ceil((deadline - serverNow()) / 1000));
   const clock = left >= 60 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : `${left} сек`;
-  const text = scene.phase === 'choosing-leader' ? `Шийдвэр гаргах: ${clock}` : `${scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`;
-  if (text !== lastTimerText) { timer.textContent = text; lastTimerText = text; }
+  if (clock !== lastTimerText) {
+    timer.innerHTML = `${controlIcon('clock')}<span>${clock}</span>`; lastTimerText = clock;
+    timer.setAttribute('aria-label', `${scene.phase === 'choosing-leader' ? 'Шийдвэр гаргах' : scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`);
+  }
   timer.classList.toggle('urgent', left <= 10 && scene.turn === 0);
-  timer.closest('.turn-hud')?.style.setProperty('--turn-progress', `${Math.min(100, left / 180 * 100)}%`);
+  const progress = `${Math.min(100, Math.max(0, deadline - serverNow()) / deadlineSpan * 100)}%`;
+  timer.closest('.turn-hud')?.style.setProperty('--turn-progress', progress);
+  document.querySelector('#seats .seat.active')?.style.setProperty('--turn-progress', progress);
 }
 function tick() {
   if (session) { renderTimer(); updateRoundControls(); updateDiscussionCountdown(); }
@@ -420,7 +428,6 @@ function showLobbyError(message, field) {
 async function createOrJoin(kind) {
   if ($('create').disabled || $('join').disabled) return;
   const name = $('lobby-name').value.trim();
-  if (!entryPicker.value) { entryPicker.requireChoice(); return; }
   if (!name) { showLobbyError('Эхлээд нэрээ оруулна уу.', 'lobby-name'); $('lobby-name').focus(); return; }
   store(NAME_KEY, name);
   const code = $('lobby-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -486,7 +493,7 @@ function onRoomState(payload) {
   if (room.seats[me]?.avatarId) { rememberAvatar(room.seats[me].avatarId); entryPicker.setValue(room.seats[me].avatarId); }
   maybeJoinVoice();
   if (payload.game) {
-    deadline = payload.game.deadline; timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
+    setDeadline(payload.game.deadline); timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
     const incoming = payload.game.view;
     const known = latestView && latestView.revision === incoming.revision && latestView.round === incoming.round;
     if (!known) {
@@ -503,7 +510,7 @@ function onRoomState(payload) {
   render(); maybeShowRound();
 }
 function onGameUpdate(update) {
-  latestView = update.view; deadline = update.deadline; timerKind = update.timer; reviewUntil = update.reviewUntil;
+  latestView = update.view; setDeadline(update.deadline); timerKind = update.timer; reviewUntil = update.reviewUntil;
   pendingUpdates.push(update);
   processQueue();
 }
@@ -549,12 +556,10 @@ async function processQueue() {
         try {
           for (const step of transitionSteps(start, engineEvents)) {
             if (motionController.signal.aborted || token !== motionEpoch) break;
-            const actor = names[step.player];
-            motionText = step.type === 'pickup' ? `${actor} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${actor} · ${step.cards.length} хөзөр тавьж байна…`;
             await animateStep(step, { render, cardElement, signal: motionController.signal });
           }
         } catch (error) { console.error(error); }
-        finally { if (token === motionEpoch) { animating = false; motionController = null; motionText = ''; } }
+        finally { if (token === motionEpoch) { animating = false; motionController = null; } }
       }
       if (rosterDirty) { rosterDirty = false; updateNames(); }
       render();
@@ -592,13 +597,13 @@ function renderDiscussion(sceneArg = scene) {
   const ours = sceneArg.openingTeam === 0;
   $('discussion-title').textContent = ours ? 'Танай баг эхэлнэ.' : 'Эсрэг баг эхэлнэ.';
   $('discussion-copy').textContent = ours
-    ? 'Дуут сувгаар ярилцаад эхлэх тоглогчийн суудлыг сонгоорой.'
+    ? 'Эхлэгчээ сонгоорой: доорх «Та» эсвэл дээрх багийн гишүүний суудал дээр дарна уу.'
     : 'Хөзөр тараалаа. Эсрэг баг эхлэх тоглогчоо сонгож байна.';
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
   if (ours) {
     openerSelection.render({ key: `${session?.code}:${sceneArg.round}:${me}`, entries: [0, 2, 4, 6].map(seat => ({ seat, name: seat === 0 ? 'Та' : names[seat], count: sceneArg.hands[seat].length })), busy: confirmPending || !connected });
-    $('confirm-opener').disabled = openerSelection.value === null || confirmPending || !connected;
+    renderConfirmOpener();
   }
   updateDiscussionCountdown();
 }

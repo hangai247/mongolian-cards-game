@@ -5,7 +5,7 @@ import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
 import { advanceSignals, reconcileSignals, setSignal } from './rules/signals.js';
 import { mountTeamSignals } from './team-signals.js';
-import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader, canLeadThree, canLeadFive } from './rules/engine.js';
+import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader } from './rules/engine.js';
 import { findPlay, chooseComputerLeader } from './rules/strategy.js';
 import { readSavedMatch } from './practice-save.js';
 import { transitionSteps, fanLayout } from './presentation.js';
@@ -14,7 +14,13 @@ import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
 const $ = id => document.getElementById(id);
-const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null; } });
+const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
+// The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
+function renderConfirmOpener() {
+  const chosen = openerSelection.value;
+  $('confirm-opener').disabled = chosen === null;
+  $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${NAMES[chosen]} эхэлнэ · батлах →`;
+}
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const STORAGE = 'naiman-gar-practice-v1';
@@ -49,7 +55,7 @@ const signalControls = mountTeamSignals({ container: document.querySelector('.ha
 function renderSignals() {
   signalControls.render({ seat: 0, phase: state?.phase, hand: state?.hands[0], signals });
 }
-let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0, motionText = '';
+let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0;
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
 import('./photographic-room.js?v=avatars1').then(({CharacterRoom}) => {
@@ -151,18 +157,16 @@ function renderActions() {
   setActionButton($('pickup'), state?.table.pile.length ? `${state.table.pile.length} хөзөр авах` : 'Авах', 'cards');
   $('pause').hidden = !state || state.phase !== 'playing';
   $('pause').textContent = paused ? 'Үргэлжлүүлэх' : 'Түр зогсоох';
-  if (animating) $('guidance').textContent = motionText;
+  if (animating) $('guidance').textContent = '';
   else if (!state) $('guidance').textContent = 'Хөзрөө харахын тулд тоглолтоо эхлүүлээрэй.';
   else if (state.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (state.phase !== 'playing') $('guidance').textContent = state.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
   else if (paused) $('guidance').textContent = 'Бэлэн болмогц үргэлжлүүлээрэй.';
-  else if (state.turn !== 0) $('guidance').textContent = `${NAMES[state.turn]} нүүдлээ сонгож байна…`;
+  // During play the capsule only explains an illegal selection or the opt-in defence coaching; the seat highlight and buttons say the rest.
+  else if (state.turn !== 0) $('guidance').textContent = '';
   else if (error) $('guidance').textContent = defenseGuidance || ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.';
-  else if (selected.size) $('guidance').textContent = defenseGuidance || 'Энэ нүүдэл зөв. Бэлэн бол тавиарай.';
-  else if (state.table.highest.length) $('guidance').textContent = `${state.table.highest.length} хөзрийг дарах эсвэл ширээний бүх хөзрийг аваарай.`;
-  else $('guidance').textContent = canLeadThree(state)
-    ? `Та эхэлнэ. Нэг эсвэл гурван хөзөр${canLeadFive(state) ? ', эсвэл хоёр хостой таван хөзөр' : ''} сонгоорой.`
-    : 'Нэг хөзрөөр эхэлнэ. Гурваас цөөн хөзөртэй тоглогч байна.';
+  else $('guidance').textContent = defenseGuidance || '';
+  $('guidance').hidden = !$('guidance').textContent;
 }
 function render(scene = state, motion = null) {
   document.body.classList.toggle('has-match', !!scene);
@@ -269,7 +273,6 @@ async function commit(move) {
     renderActions();
     for (const step of transitionSteps(previous, events)) {
       if (motionController.signal.aborted || token !== motionEpoch) break;
-      motionText = step.type === 'pickup' ? `${NAMES[actor]} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${NAMES[actor]} · ${step.cards.length} хөзөр тавьж байна…`;
       atmosphere.cue(step.type, `${token}:${step.type}`);
       if (step.type === 'pickup' && step.cards.length >= 8) characterRoom.react?.({ type: 'surprise', player: actor });
       await animateStep(step, { render, cardElement, signal: motionController.signal, motionEnabled: motionEnabled() });
@@ -280,7 +283,7 @@ async function commit(move) {
     console.error(error);
   } finally {
     if (token === motionEpoch) {
-      animating = false; motionController = null; motionText = ''; render();
+      animating = false; motionController = null; render();
       if (state && ['round-over','match-over'].includes(state.phase)) {
         if (completedPresentation && !paused && !document.hidden) {
           atmosphere.cue('win', `${token}:win`);
@@ -298,12 +301,12 @@ function renderDiscussion(scene = state) {
   const ours = scene.openingTeam === 0;
   $('discussion-title').textContent = ours ? 'Танай баг эхэлнэ.' : 'Эсрэг баг эхэлнэ.';
   $('discussion-copy').textContent = ours
-    ? 'Багтайгаа ярилцаад эхлэх тоглогчийн суудлыг сонгоорой.'
+    ? 'Эхлэгчээ сонгоорой: доорх «Та» эсвэл дээрх багийн гишүүний суудал дээр дарна уу.'
     : 'Хөзөр тараагдсан. Эсрэг баг эхлэх тоглогчоо сонгоно.';
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
   openerSelection.render({ key: scene.round, entries: [0, 2, 4, 6].map(seat => ({ seat, name: NAMES[seat], count: scene.hands[seat].length })), busy: !ours });
-  $('confirm-opener').disabled = openerSelection.value === null;
+  renderConfirmOpener();
 }
 function startMatch() {
   openerSelection.reset();
@@ -358,7 +361,6 @@ for (const button of document.querySelectorAll('[data-close]')) button.addEventL
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
 function startWithPicker(picker) {
-  if (!picker.value) { picker.requireChoice(); return false; }
   practiceAvatar = picker.value; rememberAvatar(practiceAvatar); startMatch(); return true;
 }
 $('start').addEventListener('click', () => startWithPicker(practicePicker));

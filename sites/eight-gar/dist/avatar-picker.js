@@ -17,7 +17,11 @@ export function avatarImage(id, className = 'avatar-portrait') {
   wrapper.append(fallback, img);
   return wrapper;
 }
-/** Native radio inputs provide keyboard navigation and an announced selected state. */
+/** The remembered character, or a random one so nothing has to be picked before playing. */
+export function defaultAvatar() {
+  return rememberedAvatar() ?? AVATARS[Math.floor(Math.random() * AVATARS.length)].id;
+}
+/** Native radio inputs provide keyboard navigation and an announced selected state. The picker always holds a character. */
 export function mountAvatarPicker(host, { value = null, onChange = () => {}, previewHost = null } = {}) {
   const field = document.createElement('fieldset'); field.className = 'avatar-picker';
   const legend = document.createElement('legend'); legend.textContent = 'Дүрээ сонгоорой';
@@ -26,7 +30,7 @@ export function mountAvatarPicker(host, { value = null, onChange = () => {}, pre
   const preview = document.createElement('figure'); preview.className = 'avatar-preview';
   const caption = document.createElement('figcaption');
   const status = document.createElement('p'); status.className = 'avatar-feedback'; status.setAttribute('role', 'status');
-  let current = isAvatarId(value) ? value : null, busy = false, disabled = false;
+  let current = isAvatarId(value) ? value : defaultAvatar(), busy = false, disabled = false;
   for (const avatar of AVATARS) {
     const label = document.createElement('label'); label.className = 'avatar-option';
     const radio = document.createElement('input'); radio.type = 'radio'; radio.name = `${host.id}-avatar`; radio.value = avatar.id; radio.setAttribute('aria-label', avatar.name);
@@ -44,18 +48,17 @@ export function mountAvatarPicker(host, { value = null, onChange = () => {}, pre
   function draw() {
     field.disabled = disabled || busy; field.setAttribute('aria-busy', String(busy));
     for (const radio of grid.querySelectorAll('input')) radio.checked = radio.value === current;
-    if (preview.dataset.avatarId !== (current ?? '')) {
-      preview.dataset.avatarId = current ?? '';
-      caption.textContent = current ? AVATARS.find(a => a.id === current).name : 'Долоон дүрээс өөрийн дүрийг сонгоорой';
-      preview.replaceChildren(...(current ? [avatarImage(current, 'avatar-full-preview')] : []), caption);
+    if (preview.dataset.avatarId !== current) {
+      preview.dataset.avatarId = current;
+      caption.textContent = AVATARS.find(a => a.id === current).name;
+      preview.replaceChildren(avatarImage(current, 'avatar-full-preview'), caption);
     }
   }
   draw();
   return {
     get value() { return current; },
-    setValue(id) { current = isAvatarId(id) ? id : null; draw(); },
+    setValue(id) { if (isAvatarId(id)) { current = id; draw(); } },
     setDisabled(value) { disabled = value; draw(); },
-    requireChoice() { status.textContent = 'Эхлээд дүрээ сонгоно уу.'; grid.querySelector('input')?.focus(); },
   };
 }
 

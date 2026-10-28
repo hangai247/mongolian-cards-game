@@ -31,7 +31,7 @@
 .room-actor[hidden], .room-table-mask[hidden] { display: none; }
 .ger-table .seat .avatar-fallback { display: flex !important; width: 30px; height: 30px; flex: 0 0 30px; }
 .avatar-fallback .avatar-portrait { width: 30px; height: 30px; }
-body.practice-table .welcome:has(#practice-avatar-picker) { overflow: auto; top: 100px; transform: translateX(-50%); max-height: calc(100dvh - 130px); }
+body.practice-table .welcome:has(#practice-avatar-picker) { overflow: auto; top: 100px !important; transform: translateX(-50%); max-height: calc(100dvh - 130px); }
 #practice-avatar-picker, #new-avatar-picker { display: grid; grid-template-columns: 1fr 130px; gap: 14px; margin: 20px 0; }
 #practice-avatar-picker .avatar-full-preview, #new-avatar-picker .avatar-full-preview { height: 180px; }
 #practice-avatar-picker .avatar-preview, #new-avatar-picker .avatar-preview { margin: 0; }
