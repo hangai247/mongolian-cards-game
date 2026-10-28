@@ -21,6 +21,10 @@ const selection=document.createElement('span');selection.id='selection-count';se
 // Keep set declarations in the main controls so they are discoverable on phones.
 const signalSlot=document.createElement('div');signalSlot.className='signal-slot';
 utility.append(signalSlot,selection,$('sort'));
+// A "?" beside the signal buttons opens the rules at the team-signal section.
+const signalHelp=document.createElement('button');signalHelp.type='button';signalHelp.className='icon-button signal-help';signalHelp.innerHTML=controlIcon('help');signalHelp.setAttribute('aria-label','Багийн дохионы тухай');signalHelp.title='Багийн дохионы тухай';
+signalHelp.onclick=()=>{$('rules-open').click();requestAnimationFrame(()=>$('rules-signals')?.scrollIntoView({block:'start'}));};
+signalSlot.append(signalHelp);
 let explainButton;
 const defensePanel=$('defense-preview');
 if(defensePanel){

@@ -21,12 +21,12 @@ body.ger-table{--aqua:#00d8c4;--glass:linear-gradient(160deg,#263238ed,#080f13e8
 .ger-table .round-meta .trump-details{display:flex;gap:6px;align-items:center}.ger-table .round-meta #round-label{font-size:11px;letter-spacing:0;white-space:nowrap;color:#ddd}.ger-table .trump-details>small,.ger-table #trump-name{display:none}.ger-table #trump-label{width:17px;height:23px;min-width:17px;border-radius:3px}.ger-table #trump-label .trump-pip{font-size:20px}
 .ger-table .seat:not(.seat-0),.ger-table #self-seat .seat{min-height:31px;padding:5px 10px 5px 25px;border:1px solid #bac7ca70;border-radius:18px;background:var(--glass);box-shadow:0 2px 7px #0006;flex-direction:row;gap:5px;backdrop-filter:blur(8px)}
 .ger-table .seat:not(.seat-0)>div:not(.avatar):not(.opponent-hand),.ger-table #self-seat .seat>div:not(.avatar){display:flex;flex-direction:row;justify-content:space-between;align-items:center;width:100%;gap:6px}
-.ger-table .seat .seat-name{font-size:13px;font-weight:600;overflow:visible;max-width:70%;text-overflow:ellipsis;white-space:nowrap}.ger-table .seat .seat-meta{font-size:13px;color:white;gap:5px}
+.ger-table .seat .seat-name{display:inline-flex;align-items:center;gap:4px;min-width:0;font-size:13px;font-weight:600;overflow:visible;max-width:70%;white-space:nowrap}.ger-table .seat .seat-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ger-table .seat .seat-meta{font-size:13px;color:white;gap:5px}
 .ger-table .seat .seat-back{display:inline-block;width:10px;height:14px;background:#62717e;border:1px solid #e1e7ea;border-radius:2px;box-shadow:3px -1px #52606c,4px -1px #d9dedf;transform:rotate(12deg)}
 .ger-table .seat:before{content:'';position:absolute;left:9px;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%;background:#00c5ad}.ger-table .seat.theirs:before{background:#ffab32}
 .ger-table .seat .team-mark{display:none}.ger-table .seat .player-status,.ger-table .seat .turn-marker{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
 .ger-table .seat.active{border-color:#20f1dc;box-shadow:0 0 0 1px #26d8cb60,0 0 18px #00c4aa45;background:linear-gradient(160deg,#164f4d,#0d2727)}.ger-table .seat.active:after{display:none}.ger-table .seat.next-seat{border-style:solid}.ger-table .seat.offline{border-style:dashed;opacity:.75}
-.ger-table .seat .seat-name .set-signals{position:absolute;top:-14px;right:4px}.ger-table .hand-back{background-color:#172c48;background-image:repeating-linear-gradient(45deg,transparent 0 5px,#cfb58c55 5px 6px,transparent 6px 11px),repeating-linear-gradient(-45deg,transparent 0 5px,#b69c7444 5px 6px,transparent 6px 11px);border-color:#ddcfb9}.ger-table .hand-back:after{content:'❖';color:#d8be8c;border:1px solid #cfb99199;font-size:22px}
+.ger-table .hand-back{background-color:#172c48;background-image:repeating-linear-gradient(45deg,transparent 0 5px,#cfb58c55 5px 6px,transparent 6px 11px),repeating-linear-gradient(-45deg,transparent 0 5px,#b69c7444 5px 6px,transparent 6px 11px);border-color:#ddcfb9}.ger-table .hand-back:after{content:'❖';color:#d8be8c;border:1px solid #cfb99199;font-size:22px}
 .ger-table .table-center{grid-template-rows:22px minmax(0,1fr);gap:4px;z-index:3}
 .ger-table .table-heading{position:absolute;left:0;right:0;bottom:calc(100% + 28px);max-height:none;overflow:visible}.ger-table .turn-hud .live-move{width:100%;margin:0;padding:0;border:0;border-radius:0;background:none;text-shadow:none;color:#f4f2e8;font-size:11px;line-height:1.35;text-align:center}
 .ger-table .highest{grid-row:2;--pile-card-limit:100px;--stack-peek:14px;overflow:hidden}
@@ -154,10 +154,10 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 
 /* Set declarations stay visible beside audio and sorting, including other players' turns. */
 .ger-table .table-utility{width:24%;max-width:none;min-width:260px;gap:8px}
-.ger-table .signal-slot{flex:1;min-width:0}
-.ger-table .team-signals{position:static;display:flex;align-items:center;margin:0;padding:0;border:0;background:none;box-shadow:none;max-width:none;pointer-events:auto}
+.ger-table .signal-slot{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+.ger-table .team-signals{position:static;flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:3px 0;margin:0;padding:0;border:0;background:none;box-shadow:none;max-width:none;pointer-events:auto}
 .ger-table .signal-buttons{display:flex;gap:6px;width:100%}
-.ger-table .signal-buttons button{position:relative;flex:1;min-width:0;min-height:44px;padding:6px;font-size:13px;line-height:1.2;white-space:nowrap;border:1px solid #b2d1cf88;border-radius:14px;background:#173d3c;color:#f5fffc;opacity:1}
+.ger-table .signal-buttons button{position:relative;flex:1;min-width:0;min-height:44px;padding:5px 6px;font-size:13px;line-height:1.2;white-space:nowrap;border:1px solid #b2d1cf88;border-radius:14px;background:#173d3c;color:#f5fffc;opacity:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 5px}.ger-table .signal-buttons .control-icon{width:14px;height:14px;flex:0 0 14px}.ger-table .signal-buttons button:after{content:attr(data-caption);flex-basis:100%;font-size:9px;font-weight:400;line-height:1.1;color:#9fc9c2;white-space:nowrap}.ger-table .signal-buttons button[aria-pressed=true]:after{color:#0b4a43}.ger-table .signal-buttons button:disabled:after{color:#8d989b}
 .ger-table .table-utility .team-signals .signal-buttons button{min-height:44px}
 .ger-table .signal-buttons button:disabled{color:#b7c2c4;background:#202a2e;border-color:#8b9c9f55;opacity:1}
 .ger-table .signal-buttons button[aria-pressed=true]{color:#062c27;background:#80edda;border-color:#c0fff4;box-shadow:inset 0 0 0 1px #c0fff4}
@@ -170,8 +170,8 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .card[data-rank] .card-corner small{font-size:17cqw;line-height:1}
 .ger-table .card[data-rank] .card-bottom{left:auto;top:auto;right:3%;bottom:5%}
 .ger-table .card:is([data-rank=Q],[data-rank=K],[data-rank=J]) .face-emblem{inset:12% 27%}
-.ger-table .seat .seat-name .set-signals{display:flex;gap:3px;top:-22px;right:0}
-.ger-table .seat .set-signal{display:inline-flex;align-items:center;justify-content:center;border-radius:6px;min-width:20px;min-height:20px;font-size:12px;line-height:18px;background:#123d36;color:#e0fff5;border:1px solid #80dfca}
+.ger-table .seat .seat-name .set-signals{display:inline-flex;gap:3px;flex:none;vertical-align:middle}
+.ger-table .seat .set-signal{display:inline-flex;align-items:center;justify-content:center;border-radius:5px;min-width:18px;min-height:18px;font-size:11px;line-height:16px;font-weight:700;background:#80edda;color:#062c27;border:1px solid #c0fff4}
 @media(max-aspect-ratio:1/1){
  .ger-table .table-utility{width:90%;min-width:0;gap:8px}
  .ger-table .signal-buttons button{font-size:13px;padding:6px 4px}
@@ -276,3 +276,8 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .seat.choosing-opener:has([aria-checked=true]){border-style:solid;animation:none}
 .ger-table .seat.choosing-opener:has([aria-checked=true]):after{content:'Эхлэгч ✓';background:#0f5a50f2;border-color:#5fffe4aa;color:#c8fff6}
 @keyframes opener-invite{50%{box-shadow:0 0 0 4px #ffd98a55,0 0 26px #ffcf6b88}}
+/* Team-signal help: the "?" beside the buttons yields on the narrowest phones. */
+.ger-table .table-utility .signal-help{width:32px;height:32px;min-width:32px;min-height:32px;padding:7px;order:1}
+.ger-table .signal-slot:not(:has(.team-signals:not([hidden]))) .signal-help{display:none}
+@media(max-width:700px){.ger-table .seat .set-signal{min-width:16px;min-height:16px;font-size:10px;line-height:14px}}
+@media(max-width:360px){.ger-table .signal-help{display:none}}
