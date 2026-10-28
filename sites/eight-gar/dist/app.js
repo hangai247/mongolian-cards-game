@@ -169,8 +169,7 @@ function render(sceneArg = scene, motion = null) {
   $('team-us-names').textContent = [0, 2, 4, 6].map(d => names[d]).join(' · ');
   $('team-them-names').textContent = [1, 3, 5, 7].map(d => names[d]).join(' · ');
   $('seats').replaceChildren();
-  $('self-seat').replaceChildren();
-  for (let index = 0; index < 8; index++) {
+  for (let index = 1; index < 8; index++) {
     const info = seatInfo(index);
     const count = sceneArg?.hands[index].length ?? 0;
     const shownCount = motion?.beforeCounts && ['pickup','refill'].includes(motion.type) && motion.player === index ? motion.beforeCounts[index] : count;
@@ -185,7 +184,6 @@ function render(sceneArg = scene, motion = null) {
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}${offline ? ', холболтгүй' : ''}`);
     const mic = micBadge(info, index);
     seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(info?.kind === 'bot' ? names[index].replace(/\s*\(компьютер\)$/, '') : names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${info?.kind === 'bot' ? computerBadge() : ''}${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
-    if (index === 0 && info?.kind !== 'empty') seat.querySelector('.avatar').replaceChildren(avatarImage(info?.avatarId));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${names[index]} · ${shownCount} далд хөзөртэй`);
@@ -197,7 +195,7 @@ function render(sceneArg = scene, motion = null) {
       }
       seat.append(fan);
     }
-    $(index === 0 ? 'self-seat' : 'seats').append(seat);
+    $('seats').append(seat);
   }
   characterRoom.update({ avatars: Array.from({ length: 8 }, (_, index) => { const info = seatInfo(index); return info && info.kind !== 'empty' ? info.avatarId : null; }), handCounts: sceneArg?.hands.map(hand => hand.length) ?? Array(8).fill(0), phase: sceneArg?.phase, turn: sceneArg?.turn, winner: sceneArg?.winner, paused: false }, motion);
   $('highest').replaceChildren();
@@ -552,7 +550,7 @@ async function processQueue() {
           for (const step of transitionSteps(start, engineEvents)) {
             if (motionController.signal.aborted || token !== motionEpoch) break;
             const actor = names[step.player];
-            motionText = step.type === 'pickup' ? `${actor} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Нөөцөөс нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${actor} · ${step.cards.length} хөзөр тавьж байна…`;
+            motionText = step.type === 'pickup' ? `${actor} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${actor} · ${step.cards.length} хөзөр тавьж байна…`;
             await animateStep(step, { render, cardElement, signal: motionController.signal });
           }
         } catch (error) { console.error(error); }

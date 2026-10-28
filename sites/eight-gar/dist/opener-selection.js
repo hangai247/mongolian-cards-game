@@ -49,13 +49,15 @@ export function mountOpenerSelection({ container, onChange, seatRoot = null }) {
         }
         const seat = seatRoot?.querySelector(`.seat-${player.seat}`);
         button.classList.toggle('seat-opener', Boolean(seat));
-        if (seat) { button.id = `opener-seat-${player.seat}`; seat.classList.add('choosing-opener'); if (button.parentElement !== seat) seat.append(button); }
+        button.id = `opener-seat-${player.seat}`;
+        if (seat) { seat.classList.add('choosing-opener'); if (button.parentElement !== seat) seat.append(button); }
+        else if (button.parentElement !== container) container.append(button);
         button.querySelector('.opener-avatar').textContent = player.name.trim().split(/\s+/).map(part => [...part][0]).slice(0, 2).join('').toUpperCase();
         button.querySelector('.opener-name').textContent = player.name;
         button.querySelector('.opener-count').textContent = `${player.count} хөзөр`;
         button.setAttribute('aria-label', `${player.name}, ${player.count} хөзөр`); button.title = player.name;
       }
-      container.classList.toggle('seated', Boolean(seatRoot));
+      container.classList.toggle('seated', Boolean(seatRoot) && container.children.length === 0);
       if (seatRoot) container.setAttribute('aria-owns', [...buttons.values()].map(button => button.id).join(' '));
       refresh();
     },

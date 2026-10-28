@@ -188,6 +188,12 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
  .ger-table .turn-hud{bottom:128px}
 }
 
+/* Pause is a quiet table state; the primary action resumes play. */
+.ger-table.practice-table.is-paused .turn-ring{background:#c4d3d31a;border:1px solid #c4d3d355;box-shadow:none;transform:none}
+.ger-table.practice-table.is-paused .turn-ring:after{inset:28% 32%;border-radius:0;background:linear-gradient(to right,#d5dfdf 0 30%,transparent 30% 70%,#d5dfdf 70%);box-shadow:none}
+.ger-table.practice-table.is-paused .turn-label{font-size:14px;color:#dce6e6}
+.ger-table.practice-table.is-paused #play{min-width:0;white-space:nowrap;font-size:clamp(13px,3.5vw,16px);gap:6px;padding-inline:12px}
+
 /* Wake-lock preference and actual browser status are distinct. */
 .ger-table #keep-screen-on{width:100%;text-align:left;padding:12px 36px 12px 12px;position:relative;color:#f5fffc;background:#173d3c}
 .ger-table #keep-screen-on[aria-pressed=true]:after{content:'✓';position:absolute;right:14px;color:#80edda}
@@ -217,8 +223,8 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .seat.theirs{--seat-team:#efa93e;--seat-team-glow:#efa93e4d}
 .ger-table .seat:not(.seat-0),.ger-table #self-seat .seat{border:2px solid var(--seat-team)}
 .ger-table .seat.active{border-color:var(--seat-team);box-shadow:0 0 0 2px var(--seat-team-glow),0 0 20px var(--seat-team-glow)}
-.ger-table .bot-badge{display:inline-flex;align-items:center;justify-content:center;vertical-align:-.15em;color:#c6d0d4;line-height:1}
-.ger-table .bot-badge .control-icon,.ger-table .seat .seat-meta .bot-badge .control-icon{width:14px;height:14px;flex:0 0 14px}
+.ger-table .bot-badge{display:inline-flex;align-items:center;justify-content:center;vertical-align:-.15em;color:#f5fffc;line-height:1}
+.ger-table .bot-badge .control-icon,.ger-table .seat .seat-meta .bot-badge .control-icon{width:18px;height:18px;flex:0 0 18px;stroke-width:2.2}
 .ger-table .seat .bot-badge{margin-right:2px}
 .ger-table .round-meta{min-height:38px;padding:5px 14px;gap:9px}
 .ger-table .round-meta #round-label{font-size:14px;font-weight:600;color:#f7f6f3}
@@ -252,3 +258,8 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .card.joker .card-bottom{left:auto;top:auto;right:6%;bottom:5%}
 .ger-table .card.joker .card-center{font-size:40cqw}
 .ger-table .card.joker .joker-label{font-size:6cqw;bottom:16%;letter-spacing:.1em}
+
+/* The viewer chooses to open from the discussion, without a duplicate seat badge. */
+.ger-table #opening-players:not(.seated){grid-template-columns:1fr;margin:6px 0}
+.ger-table #opening-players>.opener-card{min-height:44px;flex-direction:row;gap:8px}
+.ger-table #opening-players>.opener-card .opener-avatar{display:none}

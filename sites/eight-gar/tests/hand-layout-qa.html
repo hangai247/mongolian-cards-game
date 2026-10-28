@@ -23,6 +23,13 @@ async function load(count,width,height){
  await settle();return doc;
 }
 function check(doc,count,label){
+ for(const seat of doc.querySelectorAll('.seat:not(.seat-0)')){
+  const cards=[...seat.querySelectorAll('.hand-back')].filter(card=>card.getClientRects().length);
+  if(cards.length){
+   const cardTop=Math.min(...cards.map(card=>card.getBoundingClientRect().top));
+   assert(cardTop-seat.getBoundingClientRect().bottom>=7.5,label+': opponent cards clear '+seat.className);
+  }
+ }
  const hand=doc.querySelector('#hand'),box=hand.getBoundingClientRect(),cards=[...hand.children];
  assert(cards.length===count,label+': correct hand count');
  assert(doc.defaultView.getComputedStyle(hand).maskImage==='none',label+': no edge fade');

@@ -12,7 +12,7 @@ import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
-import { mountAvatarPicker, rememberedAvatar, rememberAvatar, avatarImage, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
+import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
 const $ = id => document.getElementById(id);
 const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null; } });
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
@@ -136,14 +136,16 @@ function playError() {
 }
 function renderActions() {
   const active = state?.phase === 'playing' && state.turn === 0 && !paused && !animating;
+  const canResume = state?.phase === 'playing' && paused && !animating;
+  document.body.classList.toggle('is-paused', !!canResume);
   for (const id of ['new-match', 'rules-open', 'sort']) $(id).disabled = animating;
   $('felt').setAttribute('aria-busy', String(animating));
   const error = active ? playError() : null;
-  $('play').disabled = !active || selected.size === 0 || !!error;
+  $('play').disabled = !canResume && (!active || selected.size === 0 || !!error);
   $('pickup').disabled = !active || state.table.pile.length === 0;
   const defenseGuidance = renderDefense({ active, hand: state?.hands[0] ?? [], selected, targets: state?.table.highest, trump: state?.trump });
-  setActionButton($('play'), 'Тавих', 'chevron', true);
-  $('play').setAttribute('aria-label', selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
+  setActionButton($('play'), canResume ? 'Үргэлжлүүлэх' : 'Тавих', 'chevron', true);
+  $('play').setAttribute('aria-label', canResume ? 'Тоглолтыг үргэлжлүүлэх' : selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
   document.body.dataset.selection = String(selected.size);
   document.body.classList.toggle('my-turn', !!active);
   setActionButton($('pickup'), state?.table.pile.length ? `${state.table.pile.length} хөзөр авах` : 'Авах', 'cards');
@@ -153,7 +155,7 @@ function renderActions() {
   else if (!state) $('guidance').textContent = 'Хөзрөө харахын тулд тоглолтоо эхлүүлээрэй.';
   else if (state.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (state.phase !== 'playing') $('guidance').textContent = state.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
-  else if (paused) $('guidance').textContent = 'Тоглолт түр зогссон. Бэлэн болмогц үргэлжлүүлээрэй.';
+  else if (paused) $('guidance').textContent = 'Бэлэн болмогц үргэлжлүүлээрэй.';
   else if (state.turn !== 0) $('guidance').textContent = `${NAMES[state.turn]} нүүдлээ сонгож байна…`;
   else if (error) $('guidance').textContent = defenseGuidance || ERRORS[error] || 'Эдгээр хөзрийг хамтад нь тавих боломжгүй.';
   else if (selected.size) $('guidance').textContent = defenseGuidance || 'Энэ нүүдэл зөв. Бэлэн бол тавиарай.';
@@ -176,8 +178,7 @@ function render(scene = state, motion = null) {
   const shownCounts = scene?.hands.map(hand => hand.length) ?? Array(8).fill(0);
   if (motion?.beforeCounts && ['pickup', 'refill'].includes(motion.type)) shownCounts[motion.player] = motion.beforeCounts[motion.player];
   $('seats').replaceChildren();
-  $('self-seat').replaceChildren();
-  for (let index = 0; index < 8; index++) {
+  for (let index = 1; index < 8; index++) {
     const count = scene?.hands[index].length ?? 0;
     const shownCount = shownCounts[index];
     const active = scene?.phase === 'playing' && scene.turn === index;
@@ -189,7 +190,6 @@ function render(scene = state, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${NAMES[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}`);
     seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${NAMES[index]}</span></span><span class="seat-meta" aria-label="${shownCount} хөзөр">${index > 0 ? computerBadge() : ''}${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
-    if (index === 0) seat.querySelector('.avatar').replaceChildren(avatarImage(practiceAvatar));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${NAMES[index]} · ${shownCount} далд хөзөртэй`);
@@ -201,7 +201,7 @@ function render(scene = state, motion = null) {
       }
       seat.append(fan);
     }
-    $(index === 0 ? 'self-seat' : 'seats').append(seat);
+    $('seats').append(seat);
   }
   renderTableInsights({ scene, motion, counts: shownCounts, names: NAMES, paused, animating });
   characterRoom.update({avatars: Array.from({length: 8}, (_, index) => index === 0 ? practiceAvatar : botAvatar(index)), handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
@@ -222,14 +222,12 @@ function render(scene = state, motion = null) {
   }
   else if (scene && scene.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'Шинээр эхэлнэ.'; $('highest').append(empty); }
   layoutTablePile($('highest'));
-  $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'ТОГЛОЛТ ТҮР ЗОГССОН' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
+  $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'Түр зогссон' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({pickup:'ХӨЗӨР АВЧ БАЙНА',play:'ХӨЗӨР ТАВЬЖ БАЙНА',refill:'НӨӨЦӨӨС НӨХӨЖ БАЙНА',sleep:'УНТАНА'})[motion.type];
   $('reserve-count').textContent = scene?.reserve.length ?? 3;
   $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = scene?.table.pile.length ?? 0;
   $('pile-open').disabled = animating || !scene?.table.pile.length;
-  $('table-message').hidden = !paused || !scene || scene.phase !== 'playing';
-  $('table-message').textContent = 'Яарах хэрэггүй. Тоглолт түр зогссон.';
   $('live-move').textContent = liveMove;
   $('live-move').title = liveMove;
   $('live-move').hidden = !liveMove;
@@ -271,7 +269,7 @@ async function commit(move) {
     renderActions();
     for (const step of transitionSteps(previous, events)) {
       if (motionController.signal.aborted || token !== motionEpoch) break;
-      motionText = step.type === 'pickup' ? `${NAMES[actor]} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Нөөцөөс нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${NAMES[actor]} · ${step.cards.length} хөзөр тавьж байна…`;
+      motionText = step.type === 'pickup' ? `${NAMES[actor]} · ${step.cards.length} хөзөр авч байна…` : step.type === 'refill' ? 'Газраас нөхөж байна…' : step.type === 'sleep' ? 'Унтана · хөзрийг хурааж байна…' : `${NAMES[actor]} · ${step.cards.length} хөзөр тавьж байна…`;
       atmosphere.cue(step.type, `${token}:${step.type}`);
       if (step.type === 'pickup' && step.cards.length >= 8) characterRoom.react?.({ type: 'surprise', player: actor });
       await animateStep(step, { render, cardElement, signal: motionController.signal, motionEnabled: motionEnabled() });
@@ -369,9 +367,17 @@ $('new-match').addEventListener('click', () => {
   newPicker.setValue(rememberedAvatar() ?? practiceAvatar); openDialog('new-dialog');
 });
 $('new-confirm').addEventListener('click', () => { if (startWithPicker(newPicker)) $('new-dialog').close(); });
-$('pause').addEventListener('click', () => { stopEffects(); paused = !paused; clearBot(); if (animating) motionController?.abort(); else { render(); scheduleBot(); } });
+function togglePause() {
+  if (state?.phase !== 'playing') return;
+  stopEffects(); paused = !paused; clearBot();
+  if (animating) motionController?.abort(); else { render(); scheduleBot(); }
+}
+$('pause').addEventListener('click', togglePause);
 $('sort').addEventListener('click', () => { byRank = !byRank; if (state) { renderHand(); save(); } });
-$('play').addEventListener('click', () => { if (state?.turn === 0 && !paused && selected.size) commit({ type: 'play', cards: [...selected] }); });
+$('play').addEventListener('click', () => {
+  if (paused) { togglePause(); return; }
+  if (state?.turn === 0 && selected.size) commit({ type: 'play', cards: [...selected] });
+});
 $('pickup').addEventListener('click', () => { if (state?.turn === 0 && !paused) commit({ type: 'pickup' }); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopEffects(); clearBot(); motionController?.abort(); } else scheduleBot();

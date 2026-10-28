@@ -88,7 +88,19 @@ export class CharacterRoom {
         placed.push({...p,height});
       }
       const fan=node.querySelector('.opponent-hand');
-      if(fan)Object.assign(fan.style,{left:`calc(50% + ${p.handX-p.x}px)`,top:`${p.handY-p.y-82+node.getBoundingClientRect().height/2}px`,transform:`translateX(-50%) scale(${p.fanScale})`});
+      if(fan){
+        const fanTop=p.handY-p.y-82+node.getBoundingClientRect().height/2;
+        Object.assign(fan.style,{left:`calc(50% + ${p.handX-p.x}px)`,top:`${fanTop}px`,transform:`translateX(-50%) scale(${p.fanScale})`});
+        // Measure the rotated cards, since the fan container includes empty space.
+        // Lift the label while keeping the cards anchored to the character's hands.
+        const cards=[...fan.querySelectorAll('.hand-back')].filter(card=>card.getClientRects().length);
+        if(cards.length){
+          const cardTop=Math.min(...cards.map(card=>card.getBoundingClientRect().top));
+          const lift=Math.max(0,node.getBoundingClientRect().bottom+8-cardTop);
+          node.style.top=`${p.y-lift}px`;
+          fan.style.top=`${fanTop+lift}px`;
+        }
+      }
     }
   }
   update(snapshot,motion=null) {

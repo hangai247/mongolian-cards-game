@@ -23,7 +23,7 @@ export function renderTableInsights({ scene, motion, counts, names, paused = fal
   $('sleep-progress').setAttribute('aria-valuetext', `8 нүүдлээс ${progress}`);
   for (const [index, node] of [...$('sleep-markers').children].entries()) node.classList.toggle('filled', index < progress);
   setText($('sleep-label'), `Унтана · ${progress}/8 нүүдэл`);
-  const sleepText = progress === 8 ? (motion?.type === 'sleep' ? 'Унтана — хөзөр унтлаа.' : 'Найман нүүдэл — нөөцөөс нөхсөний дараа хөзөр унтана.') : progress === 7
+  const sleepText = progress === 8 ? (motion?.type === 'sleep' ? 'Унтана — хөзөр унтлаа.' : 'Найман нүүдэл — газраас нөхсөний дараа хөзөр унтана.') : progress === 7
     ? 'Дахин нэг удаа дарвал хөзөр унтана. Найм дахь тоглогч хожоогүй бол дахин эхэлнэ.' : '';
   setText($('sleep-note'), meter.hidden ? '' : sleepText);
   meter.title = sleepText || 'Нэг удаа эхэлж тавиад дараалан долоон удаа дарвал хөзөр унтана.';
