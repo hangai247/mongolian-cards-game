@@ -1,8 +1,8 @@
 import { availableSetSizes, signalsForPlayer } from './rules/signals.js';
 import { controlIcon } from './control-icons.js';
 
-// Shown under each button so the state (and the meaning of the button) is visible without hovering.
-const STATE_CAPTIONS = { sent: 'мэдэгдсэн', ready: 'багтаа мэдэгдэх', none: 'багц алга' };
+// Shown under each button so the state (and the meaning of the button) is visible without hovering; a greyed button needs no caption.
+const STATE_CAPTIONS = { sent: 'мэдэгдсэн', ready: 'багтаа мэдэгдэх', none: '' };
 
 /** Online callers pass only their own hand and server-filtered teammate signals. */
 export function mountTeamSignals({ container, onToggle }) {
@@ -52,7 +52,7 @@ export function mountTeamSignals({ container, onToggle }) {
         const state = enabled ? 'sent' : available.includes(size) ? 'ready' : 'none';
         button.dataset.state = state; button.dataset.caption = STATE_CAPTIONS[state];
         button.title = enabled ? 'Багтаа мэдэгдсэн · дахин дарж арилгана' : state === 'ready' ? 'Энэ багц гартаа байгааг багтаа мэдэгдэх' : `Гартаа ${size} масстай багц алга`;
-        button.setAttribute('aria-label', `${size} масстай · ${STATE_CAPTIONS[state]}`);
+        button.setAttribute('aria-label', `${size} масстай · ${STATE_CAPTIONS[state] || 'багц алга'}`);
       }
       const own = visible.filter(signal => signal.seat === seat).map(signal => signal.size);
       const message = own.length ? `Мэдэгдсэн: ${own.join(' болон ')} хөзрийн багц` : 'Дохио өгөөгүй';
