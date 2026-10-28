@@ -145,6 +145,7 @@ function seatStatus(sceneArg, index, motion, count, active, winning) {
 }
 function render(sceneArg = scene, motion = null) {
   document.body.classList.toggle('has-match', !!sceneArg);
+  document.dispatchEvent(new CustomEvent('game-activity', { detail: { active: ['choosing-leader', 'playing'].includes(sceneArg?.phase) } }));
   $('welcome').hidden = !!sceneArg;
   $('table-stats').hidden = !sceneArg;
   $('new-match').hidden = !session;
@@ -171,7 +172,7 @@ function render(sceneArg = scene, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}${offline ? ', холболтгүй' : ''}`);
     const mic = micBadge(info, index);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div><span class="seat-name">${escapeHtml(names[index])}${mic}</span><span class="seat-meta">${controlIcon('cards')} ${shownCount}</span></div><span class="player-status">${status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${names[index]} · ${shownCount} далд хөзөртэй`);

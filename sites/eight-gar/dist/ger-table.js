@@ -1,7 +1,8 @@
 // Shared presentation chrome. Existing game controls keep their handlers and state.
 const $ = id => document.getElementById(id);
 import { controlIcon, setActionButton } from './control-icons.js';
-const icons = Object.fromEntries(['settings','sound','muted','hint','signals','copy'].map(name=>[name,controlIcon(name)]));
+import { mountScreenWakeLock } from './screen-wake-lock.js';
+const icons = Object.fromEntries(['settings','sound','muted','copy'].map(name=>[name,controlIcon(name)]));
 const brand=document.querySelector('.brand-mark');
 brand.innerHTML='<svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round" aria-hidden="true"><path d="m28 3 8 8-8 8-8-8ZM28 37l8 8-8 8-8-8ZM3 28l8-8 8 8-8 8Zm34 0 8-8 8 8-8 8ZM28 14l14 14-14 14-14-14Z"/><path d="m16 16 24 24M16 40l24-24M23 23h10v10H23Z"/></svg>';
 document.querySelector('.brand small').textContent='Найзуудын ширээ';
@@ -17,12 +18,9 @@ text.append($('turn-label'));if($('turn-timer'))text.append($('turn-timer'));
 const guidance=$('guidance');text.append(guidance);hud.append(ring,text);$('felt').append(hud);
 const utility=document.createElement('div');utility.className='table-utility';
 const selection=document.createElement('span');selection.id='selection-count';selection.setAttribute('aria-live','polite');
-const signalToggle=document.createElement('button');signalToggle.className='icon-button';signalToggle.type='button';signalToggle.id='signals-toggle';signalToggle.innerHTML=icons.signals;signalToggle.title='Багийн нууц дохио';signalToggle.setAttribute('aria-label',signalToggle.title);signalToggle.setAttribute('aria-expanded','false');
-signalToggle.setAttribute('aria-controls','team-signals-panel');
-const signalPanel=document.querySelector('.team-signals');
-if(signalPanel){signalPanel.id='team-signals-panel';signalToggle.setAttribute('aria-controls',signalPanel.id);}
-signalToggle.addEventListener('click',()=>{const open=document.body.classList.toggle('signals-open');signalToggle.setAttribute('aria-expanded',String(open));});
-utility.append(signalToggle,selection,$('sort'));
+// Keep set declarations in the main controls so they are discoverable on phones.
+const signalSlot=document.createElement('div');signalSlot.className='signal-slot';
+utility.append(signalSlot,selection,$('sort'));
 let explainButton;
 const defensePanel=$('defense-preview');
 if(defensePanel){
@@ -36,14 +34,13 @@ const voice=document.querySelector('.voice-dock');if(voice)utility.prepend(voice
 document.querySelector('.hand-zone').append(utility);
 $('sort').setAttribute('aria-label','Хөзрөө эрэмбэлэх');
 setActionButton($('sort'),'Эрэмбэлэх','sort');
-// Only the practice table offers suggestions; the online table has no hint button.
-if($('hint')){$('hint').setAttribute('aria-label','Санал авах');$('hint').title='Санал авах';$('hint').innerHTML=icons.hint+'<span>Санал</span>';}
 // Settings is a real dialog: rules and existing new-match/leave controls remain reachable.
 const settings=document.createElement('dialog');settings.id='table-settings';settings.setAttribute('aria-labelledby','settings-title');
 settings.innerHTML='<div class="dialog-top"><span class="eyebrow">8 ГАР · ШИРЭЭ</span><button class="close-button" aria-label="Хаах">×</button></div><h2 id="settings-title">Ширээний тохиргоо</h2><div class="settings-actions"></div>';
 settings.querySelector('.close-button').onclick=()=>settings.close();settings.addEventListener('click',e=>{if(e.target===settings){const b=settings.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)settings.close();}});
 for(const id of ['rules-open','new-match']){const b=$(id);settings.querySelector('.settings-actions').append(b);b.addEventListener('click',()=>settings.close());}
 if(explainButton){settings.querySelector('.settings-actions').append(explainButton);explainButton.addEventListener('click',()=>settings.close());}
+mountScreenWakeLock(settings.querySelector('.settings-actions'));
 const head=document.querySelector('.header-right');
 const settingsButton=document.createElement('button');settingsButton.className='icon-button';settingsButton.innerHTML=icons.settings;settingsButton.title='Тохиргоо';settingsButton.setAttribute('aria-label','Тохиргоо');settingsButton.onclick=()=>settings.showModal();head.append(settingsButton);document.body.append(settings);
 // Practice audio is local. Online audio uses the existing voice control instead.
@@ -61,4 +58,4 @@ if($('room-badge')){
 function updateSelection(){const count=Number(document.body.dataset.selection||0);const value=count?`${count} хөзөр сонгосон`:`${$('hand').children.length} хөзөр`;if(selection.textContent!==value)selection.textContent=value;}
 new MutationObserver(updateSelection).observe(document.body,{attributes:true,attributeFilter:['data-selection']});
 new MutationObserver(updateSelection).observe($('hand'),{childList:true});updateSelection();
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('signals-open','defense-open');document.querySelector('.defense-toggle')?.setAttribute('aria-expanded','false');signalToggle.setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('defense-open');document.querySelector('.defense-toggle')?.setAttribute('aria-expanded','false');}});

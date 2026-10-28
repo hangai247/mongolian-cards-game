@@ -1,6 +1,6 @@
 <!doctype html><meta charset="utf-8"><title>Practice table layout checks</title>
 <style>[hidden]{display:none!important}body{margin:0;background:#eee;color:#222;font:14px system-ui}header{position:sticky;top:0;z-index:2;background:#fff;padding:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}button,select{padding:8px}iframe{display:block;border:0;margin:12px auto;background:#17130f}pre{white-space:pre-wrap;margin:15px}#output{max-height:180px;overflow:auto}</style>
-<header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>568</option><option>700</option><option>844</option><option>1440</option></select></label><label>Height <input id="height" type="number" value="844" min="300" max="1600" style="width:65px;padding:8px"></label><label>Scenario <select id="scenario"><option value="opener">Choose opening player</option><option value="reference">Reference preview</option><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option><option value="stack3">Stacked plays</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
+<header><strong>Practice table QA</strong><label>Width <select id="width"><option>320</option><option selected>390</option><option>568</option><option>700</option><option>844</option><option>1440</option></select></label><label>Height <input id="height" type="number" value="844" min="300" max="1600" style="width:65px;padding:8px"></label><label>Scenario <select id="scenario"><option value="opener">Choose opening player</option><option value="reference">Reference preview</option><option value="courts">Court cards and signals</option><option value="defense">Three-card defense</option><option value="five">Five-card defense</option><option value="sleep">Sleep with refill</option><option value="win">Winning eighth play</option><option value="pickup">Large pickup</option><option value="stack3">Stacked plays</option></select></label><button id="load">Load scenario</button><button id="run">Run browser checks</button><button id="clean">Clean preview</button><span id="status">Ready</span></header>
 <pre id="output"></pre><iframe id="game" title="Practice table preview" width="390" height="844"></iframe>
 <script type="module">
 import {renderTrumpCard} from '../dist/trump-card.js';
@@ -11,8 +11,8 @@ const cards=createDeck(),card=(suit,rank)=>cards.find(c=>c.suit===suit&&c.rank==
 const h=r=>card('hearts',r),s=r=>card('spades',r),d=r=>card('diamonds',r),b=r=>card('clubs',r);
 let errors=[];
 function fixture(kind){
- if(kind==='reference'){
-  const own=[h('10'),h('Q'),d('8'),d('Q'),s('2')],pile=[b('7'),s('7'),d('3')],pool=cards.filter(c=>![...own,...pile].includes(c));
+ if(kind==='reference'||kind==='courts'){
+  const own=kind==='courts'?[h('K'),d('K'),h('Q'),d('Q'),s('J')]:[h('10'),h('Q'),d('8'),d('Q'),s('2')],pile=[b('7'),s('7'),d('3')],pool=cards.filter(c=>![...own,...pile].includes(c));
   const reserve=pool.splice(0,3),hands=[own,...Array.from({length:7},()=>pool.splice(0,4))];hands[7].push(...pool);
   return {...createMatch(cards,0),hands,reserve,table:{pile,highest:pile}};
  }
@@ -49,7 +49,8 @@ async function load(kind='defense',width=390,height=844,flags={}){
  await waitFor(()=>kind.includes('opener') ? !frame.contentDocument.querySelector('#discussion')?.hidden : frame.contentDocument.querySelectorAll('#hand .card').length>0,'practice module');
  await waitFor(()=>frame.contentDocument.querySelector('.seat-0')?.style.left&&frame.contentDocument.querySelector('.room-photo')?.naturalWidth>0,'room artwork and seating');
  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
- if(kind==='reference'){frame.contentDocument.querySelector('#pause').click();frame.contentDocument.querySelector('[aria-label="Дөрвөлжин 8"]').click();}
+ if(kind==='reference'||kind==='courts')frame.contentDocument.querySelector('#pause').click();
+ if(kind==='reference')frame.contentDocument.querySelector('[aria-label="Дөрвөлжин 8"]').click();
  frame.contentWindow.addEventListener('error',e=>errors.push(e.message));
  frame.contentWindow.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
  return frame.contentDocument;
@@ -58,20 +59,44 @@ const assert=(condition,message)=>{if(!condition)throw new Error(message);report
 const rect=node=>node.getBoundingClientRect();
 function checkViewport(doc,width,height,label){
  const win=frame.contentWindow;
+ assert(!doc.querySelector('#hint'),label+': move suggestion control removed');
  const trump=doc.querySelector('#trump-label'), trumpBox=rect(trump), scoreBox=rect(doc.querySelector('.scoreboard'));
  assert(trumpBox.width>=13&&trumpBox.height>=18&&trump.children.length===1&&trumpBox.top>=scoreBox.bottom-1&&trumpBox.bottom<=height,label+': trump card is compact, single-suit and fully visible');
  const meta=rect(doc.querySelector('.round-meta')),teams=doc.querySelectorAll('.team-score');
  assert(meta.top>=rect(teams[0]).bottom-1&&meta.top>=rect(teams[1]).bottom-1,label+': trump and team scores do not overlap');
 
  assert(doc.documentElement.scrollHeight<=height+1&&doc.documentElement.scrollWidth<=width+1,label+': no page scrolling');
- for(const id of ['play','pickup','hint','hand','highest','character-room']){
+ for(const id of ['play','pickup','hand','highest','character-room']){
   const box=rect(doc.getElementById(id));assert(box.width>0&&box.height>0&&box.top>=0&&box.bottom<=height+1&&box.right<=width+1,label+': '+id+' remains in the viewport');
  }
- if(width<=700)for(const id of ['play','pickup','hint'])assert(rect(doc.getElementById(id)).height>=(width>height?40:48),label+': '+id+' touch target');
+ if(width<=700)for(const id of ['play','pickup'])assert(rect(doc.getElementById(id)).height>=(width>height?40:48),label+': '+id+' touch target');
+ for(const button of doc.querySelectorAll('[data-signal-size]')){
+  const box=rect(button);
+  assert(box.width>=44&&box.height>=44&&box.left>=0&&box.right<=width&&box.top>=0&&box.bottom<=height,label+': '+button.textContent+' always visible with a touch target');
+  assert(button.contains(doc.elementFromPoint(box.x+box.width/2,box.y+box.height/2)),label+': '+button.textContent+' is unobstructed');
+ }
  assert(win.getComputedStyle(doc.querySelector('#character-room')).display!=='none',label+': portraits always visible');
  assert(!doc.querySelector('#focus-table')&&!doc.querySelector('#atmosphere-open')&&!doc.querySelector('#atmosphere-dialog'),label+': mode controls removed');
  assert(doc.querySelectorAll('#seats .seat').length===7&&doc.querySelectorAll('#self-seat .seat').length===1,label+': seven portrait seats and local seat retained');
  const handCard=doc.querySelector('#hand .card');if(handCard)assert(rect(handCard).height>=50,label+': hand cards remain readable');
+}
+function checkSeatLabels(doc,width,height,label){
+ const seats=[...doc.querySelectorAll('#seats .seat')];
+ for(const seat of seats){
+  const box=rect(seat),name=seat.querySelector('.seat-name-text'),count=seat.querySelector('.seat-meta');
+  assert(box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height,label+': player badge fits');
+  for(const text of [name,count]){
+   const textBox=rect(text),style=frame.contentWindow.getComputedStyle(text);
+   assert(text.scrollWidth<=text.clientWidth+1&&style.textOverflow!=='ellipsis',label+': '+text.textContent+' is complete');
+   assert(textBox.left>=box.left&&textBox.right<=box.right&&textBox.top>=box.top&&textBox.bottom<=box.bottom,label+': name/count stays inside its badge');
+   assert(text.contains(doc.elementFromPoint(textBox.x+textBox.width/2,textBox.y+textBox.height/2)),label+': '+text.textContent+' is unobstructed');
+  }
+  assert(rect(name).bottom<=rect(count).top,label+': name and count have separate rows');
+ }
+ for(let i=0;i<seats.length;i++)for(let j=i+1;j<seats.length;j++){
+  const a=rect(seats[i]),b=rect(seats[j]);
+  assert(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top,label+': player badges do not overlap');
+ }
 }
 async function run(){
  report.textContent='';errors=[];status.textContent='Running…';document.querySelector('#run').disabled=true;
@@ -84,9 +109,29 @@ async function run(){
   assert(picker.value===2&&[...pickerNode.children].every(n=>n.disabled),'server updates preserve the selected opener while confirmation is pending');
   picker.render({key:'round-2',entries});
   assert(picker.value===null&&pickerNode.querySelectorAll('[aria-checked=true]').length===0,'a new round clears the opener selection');
+  for(const [width,height] of [[320,568],[390,700],[390,844],[568,320],[844,390],[1440,900]]){
+   const doc=await load('courts',width,height);const label=width+'×'+height+' courts';
+   checkViewport(doc,width,height,label);checkSeatLabels(doc,width,height,label);
+   for(const card of doc.querySelectorAll('#hand .card')){
+    const art=card.querySelector('.face-emblem'),corner=card.querySelector('.card-corner');
+    assert(corner.offsetLeft+corner.offsetWidth<=art.offsetLeft,label+': '+card.dataset.rank+' has a separate rank/suit gutter');
+   }
+   for(const button of doc.querySelectorAll('[data-signal-size]')){
+    assert(!button.disabled,label+': valid set can be declared');button.click();
+    assert(button.getAttribute('aria-pressed')==='true',label+': '+button.textContent+' declaration is selected');
+    assert(button.scrollWidth<=button.clientWidth,label+': selected label fits');
+    button.click();assert(button.getAttribute('aria-pressed')==='false',label+': declaration can be cleared');
+   }
+   const longNames=['Ба','Са','Бат-Эрдэнэ','Мөнх-Эрдэнэ Бат-Оргил','Alexanderthegreat','Сарантуяа','Энхжаргал'];
+   doc.querySelectorAll('#seats .seat-name-text').forEach((node,i)=>node.textContent=longNames[i]);
+   frame.contentWindow.dispatchEvent(new Event('resize'));
+   doc.querySelector('.felt').dispatchEvent(new Event('pilechange'));
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   checkSeatLabels(doc,width,height,label+' long names');
+  }
   for(const [width,height] of [[320,568],[568,320],[390,700],[390,844],[700,900],[844,390],[1024,600],[1440,900]]){
    const doc=await load('defense',width,height);const label=width+'×'+height;
-   checkViewport(doc,width,height,label);
+   checkViewport(doc,width,height,label);checkSeatLabels(doc,width,height,label);
    for(const [suit,symbol,name,color] of [['hearts','♥','Бундан','rgb(181, 35, 44)'],['diamonds','♦','Дөрвөлжин','rgb(181, 35, 44)'],['spades','♠','Гил','rgb(25, 25, 23)'],['clubs','♣','Цэцэг','rgb(25, 25, 23)']]){
     const card=doc.querySelector('#trump-label');renderTrumpCard(card,doc.querySelector('#trump-name'),suit);
     assert(card.querySelector('.trump-pip').textContent.startsWith(symbol)&&card.getAttribute('aria-label')==='Хөзөр: '+name&&doc.querySelector('#trump-name').textContent===name,label+': '+suit+' symbol and accessible name');
@@ -147,7 +192,7 @@ async function run(){
   doc.querySelector(`[data-card-id="${CSS.escape(s('3').id)}"]`).click();doc.querySelector('#play').click();
   await waitFor(()=>doc.querySelector('#card-motion').dataset.motion==='sleep','sleep animation');
   assert(doc.querySelector('#sleep-label').textContent.includes('8/8'),'sleep animation shows 8/8');
-  await waitFor(()=>doc.querySelector('#sleep-label').textContent.includes('0/8')&&!doc.querySelector('#hint').disabled,'sleep settles');
+  await waitFor(()=>doc.querySelector('#sleep-label').textContent.includes('0/8')&&doc.querySelector('#felt').getAttribute('aria-busy')==='false'&&!doc.querySelector('#hand .card').disabled,'sleep settles');
   assert(doc.querySelector('.seat-0').classList.contains('active'),'eighth actor retains lead after refill');
   doc=await load('win',390,844);doc.querySelector('#pause').click();doc.querySelector(`[data-card-id="${CSS.escape(s('3').id)}"]`).click();doc.querySelector('#play').click();
   await waitFor(()=>doc.querySelector('#round-dialog').open,'round win');

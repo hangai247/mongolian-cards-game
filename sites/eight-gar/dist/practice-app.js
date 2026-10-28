@@ -136,7 +136,6 @@ function renderActions() {
   const error = active ? playError() : null;
   $('play').disabled = !active || selected.size === 0 || !!error;
   $('pickup').disabled = !active || state.table.pile.length === 0;
-  $('hint').disabled = !active;
   const defenseGuidance = renderDefense({ active, hand: state?.hands[0] ?? [], selected, targets: state?.table.highest, trump: state?.trump });
   setActionButton($('play'), 'Тавих', 'chevron', true);
   $('play').setAttribute('aria-label', selected.size ? `${selected.size} хөзөр тавих` : 'Тавих');
@@ -160,6 +159,7 @@ function renderActions() {
 }
 function render(scene = state, motion = null) {
   document.body.classList.toggle('has-match', !!scene);
+  document.dispatchEvent(new CustomEvent('game-activity', { detail: { active: ['choosing-leader', 'playing'].includes(scene?.phase) && !paused } }));
   $('welcome').hidden = !!scene;
   $('table-stats').hidden = !scene;
   $('score-us').textContent = scene?.scores[0] || 0;
@@ -182,7 +182,7 @@ function render(scene = state, motion = null) {
     seat.className = `seat seat-${index} ${index % 2 ? 'theirs' : 'ours'}${active ? ' active' : ''}${winning ? ' celebrating' : ''}`;
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${NAMES[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}`);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div><span class="seat-name">${NAMES[index]}</span><span class="seat-meta">${controlIcon('cards')} ${shownCount}</span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${NAMES[index]}</span></span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
       fan.setAttribute('aria-label', `${NAMES[index]} · ${shownCount} далд хөзөртэй`);
@@ -359,12 +359,6 @@ $('pause').addEventListener('click', () => { stopEffects(); paused = !paused; cl
 $('sort').addEventListener('click', () => { byRank = !byRank; if (state) { renderHand(); save(); } });
 $('play').addEventListener('click', () => { if (state?.turn === 0 && !paused && selected.size) commit({ type: 'play', cards: [...selected] }); });
 $('pickup').addEventListener('click', () => { if (state?.turn === 0 && !paused) commit({ type: 'pickup' }); });
-$('hint').addEventListener('click', () => {
-  if (state?.turn !== 0 || paused) return;
-  const cards = findPlay(state); selected = new Set(cards || []); renderHand(); renderActions();
-  if (!cards) toast('Дарах хөзөр алга. Ширээний хөзрийг аваарай.');
-  else toast(`Санал болгосон ${cards.length} хөзрийг сонголоо. Тавих эсэхээ та шийдээрэй.`);
-});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopEffects(); clearBot(); motionController?.abort(); } else scheduleBot();
 });

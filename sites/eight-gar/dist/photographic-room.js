@@ -51,9 +51,21 @@ export class CharacterRoom {
   }
   layoutSeats() {
     if(!this.layout)return;
-    for(const p of this.layout.seats){
+    const placed=[];
+    const ordered=this.layout.compactLabels?[4,3,5,2,6,1,7,0].map(seat=>this.layout.seats[seat]):this.layout.seats;
+    for(const p of ordered){
       const node=document.querySelector(`.seat-${p.seat}`);if(!node)continue;
       Object.assign(node.style,{left:`${p.x}px`,top:`${p.y}px`,width:`${p.width}px`});
+      if(this.layout.compactLabels&&p.seat!==0){
+        const height=node.getBoundingClientRect().height;
+        for(const other of placed){
+          if(Math.abs(p.x-other.x)<(p.width+other.width)/2+4&&Math.abs(p.y-other.y)<(height+other.height)/2+6){
+            p.y=other.y+(height+other.height)/2+6;
+          }
+        }
+        node.style.top=`${p.y}px`;
+        placed.push({...p,height});
+      }
       const fan=node.querySelector('.opponent-hand');
       if(fan)Object.assign(fan.style,{left:`calc(50% + ${p.handX-p.x}px)`,top:`${p.handY-p.y-82+node.getBoundingClientRect().height/2}px`,transform:`translateX(-50%) scale(${p.fanScale})`});
     }

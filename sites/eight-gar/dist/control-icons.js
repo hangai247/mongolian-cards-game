@@ -6,7 +6,6 @@ const paths = {
  mic: '<rect x="9" y="2" width="6" height="13" rx="3" fill="currentColor" stroke="none"/><path d="M5.5 10v2a6.5 6.5 0 0 0 13 0v-2M12 18.5V22m-4 0h8"/>',
  micOff: '<path d="M9 5a3 3 0 0 1 6 0v5M9 9v3a3 3 0 0 0 5.1 2.1M5.5 10v2a6.5 6.5 0 0 0 11.1 4.6M18.5 10v2M12 18.5V22m-4 0h8M3 3l18 18"/>',
  loading: '<path d="M12 3a9 9 0 1 1-9 9"/>',
- hint: '<path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4ZM12 1v1M2 9H1m22 0h-1M4 3l1 1m14 0 1-1"/>',
  signals: '<path fill="currentColor" stroke="none" d="M6 3h12a4 4 0 0 1 4 4v9a4 4 0 0 1-4 4H9l-6 3v-4a4 4 0 0 1-1-3V7a4 4 0 0 1 4-4Z"/><g fill="#1b2227" stroke="none"><circle cx="7" cy="11.5" r="1.4"/><circle cx="12" cy="11.5" r="1.4"/><circle cx="17" cy="11.5" r="1.4"/></g>',
  copy: '<rect x="8" y="7" width="12" height="14" rx="2"/><path d="M16 4V3H4v14h1"/>',
  sort: '<path d="M7 3v18M3 7l4-4 4 4M17 21V3m-4 14 4 4 4-4"/>',

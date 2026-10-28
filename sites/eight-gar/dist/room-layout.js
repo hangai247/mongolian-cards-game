@@ -17,14 +17,21 @@ export function roomLayout(width, height) {
   const scale = Math.min(width / source.width, height / source.height);
   const x = (width - source.width * scale) / 2, y = source === tall ? 0 : (height - source.height * scale) / 2;
   const point = ([px,py]) => ({x:x+px*scale,y:y+py*scale});
-  const labelWidth = Math.min(source===tall?132:156, Math.max(44, source.width*scale*(source===tall?.18:.105)));
+  const labelWidth = Math.min(source===tall?132:156, Math.max(68, source.width*scale*(source===tall?.18:.105)));
   const [px,py,pw,ph] = source.play;
   return {
-    portrait:source===tall,image:source.image,x,y,width:source.width*scale,height:source.height*scale,
+    portrait:source===tall,compactLabels:source===tall&&width<=700,image:source.image,x,y,width:source.width*scale,height:source.height*scale,
     imageTop:0,imageHeight:source.height*scale,
     play:{...point([px,py]),x:Math.max(0,point([px,py]).x-(Math.max(110,pw*scale)-pw*scale)/2),width:Math.max(110,pw*scale),height:Math.max(52,ph*scale)},
     seats:source.labels.map((label,seat)=>{
       const pos=point(label),hand=source.hands[seat]&&point(source.hands[seat]);
+      if(source===wide&&width<=700&&seat===6)pos.x=Math.min(pos.x,width-labelWidth*1.5-6);
+      if(source===tall&&width<=700){
+        if(seat===3)pos.x=width/2-labelWidth-6;
+        if(seat===5)pos.x=width/2+labelWidth+6;
+        if(seat===1||seat===2)pos.x=labelWidth/2+6;
+        if(seat===6||seat===7)pos.x=width-labelWidth/2-6;
+      }
       return {...pos,x:Math.max(seat===0?64:labelWidth/2,Math.min(width-(seat===0?64:labelWidth/2),pos.x)),y:Math.max(24,Math.min(height-24,pos.y)),width:labelWidth,handX:hand?.x??pos.x,handY:hand?Math.min(height,hand.y+16*scale):pos.y,
         fanScale:Math.max(.15,Math.min(1,scale*1.12)),seat};
     }),

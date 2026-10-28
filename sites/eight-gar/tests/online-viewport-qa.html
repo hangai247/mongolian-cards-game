@@ -8,7 +8,7 @@ const waitFor=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;awa
 function check(width,height,label){
  const doc=frame.contentDocument;
  assert(doc.documentElement.scrollWidth<=width+1&&doc.documentElement.scrollHeight<=height+1,label+': page fits');
- for(const id of ['rules-open','new-match','copy-link','invite-friend','voice-mic','signals-toggle','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup']){
+ for(const id of ['rules-open','new-match','copy-link','invite-friend','voice-mic','team-signals-panel','sort','welcome','discussion','opening-players','confirm-opener','hand','play','pickup']){
   const node=doc.getElementById(id);if(!node||!node.getClientRects().length)continue;const box=node.getBoundingClientRect();
   assert(box.width>0&&box.height>0&&box.left>=0&&box.right<=width+1&&box.top>=0&&box.bottom<=height+1,label+': '+id+' visible');
  }
@@ -29,6 +29,11 @@ document.querySelector('#run').onclick=async()=>{
   for(const [width,height] of [[320,568],[568,320],[390,844],[700,900],[844,390],[1440,900]]){frame.width=width;frame.height=height;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));// No LiveKit service is required to check the microphone's touch layout.
    const mic=doc.querySelector('#voice-mic');mic.hidden=false;
    check(width,height,`${width}×${height} game`);
+   for(const button of doc.querySelectorAll('[data-signal-size]')){
+    const bounds=button.getBoundingClientRect();
+    assert(bounds.width>=44&&bounds.height>=44&&bounds.left>=0&&bounds.right<=width&&bounds.bottom<=height,`${width}×${height}: ${button.textContent} stays visible`);
+    assert(button.contains(doc.elementFromPoint(bounds.x+bounds.width/2,bounds.y+bounds.height/2)),`${width}×${height}: signal is unobstructed beside the microphone`);
+   }
    const box=mic.getBoundingClientRect();
    assert(box.width>=44&&box.height>=44&&box.top>height*.65,`${width}×${height}: microphone is a reachable bottom touch target`);
    assert(mic.contains(doc.elementFromPoint(box.x+box.width/2,box.y+box.height/2)),`${width}×${height}: microphone is unobstructed`);

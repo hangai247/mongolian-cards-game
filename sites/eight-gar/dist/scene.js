@@ -1,4 +1,4 @@
-/** Rotates a server PlayerView into the State-shaped "scene" the renderer, animations and hint logic expect.
+/** Rotates a server PlayerView into the State-shaped "scene" the renderer and animations expect.
  *  Display seat 0 is always the viewer; hidden cards are opaque placeholders, never real identities. */
 const SEATS = 8;
 export const displaySeat = (seat, me) => (((seat - me) % SEATS) + SEATS) % SEATS;

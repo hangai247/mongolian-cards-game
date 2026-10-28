@@ -22,8 +22,9 @@ export function mountTeamSignals({ container, onToggle }) {
     button.type = 'button';
     button.className = 'quiet-button';
     button.dataset.signalSize = String(size);
-    button.textContent = `${size} хөзрийн багц`;
+    button.textContent = `${size} масстай`;
     button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-label', `${size} масстай · багийн нууц дохио`);
     button.addEventListener('click', () => {
       if (!current || button.disabled) return;
       onToggle(size, !current.signals.some(signal => signal.seat === current.seat && signal.size === size));
@@ -31,7 +32,7 @@ export function mountTeamSignals({ container, onToggle }) {
     buttons.append(button);
   }
   panel.append(label, buttons, status);
-  container.append(panel);
+  (container.querySelector('.signal-slot') ?? container).append(panel);
   return {
     render({ seat, phase, hand = [], signals = [], busy = false }) {
       const visible = signalsForPlayer(signals, seat);
