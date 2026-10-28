@@ -33,6 +33,10 @@ Online and practice interfaces use Mongolian Cyrillic (`lang="mn"`), including t
 
 Round and match results use a nonmodal panel in the hand dock (`dist/round-review.css`). The final table pile remains visible as a stack and available to enlarge while online review and deal timers continue. Voice controls remain available. To verify the layout and next-deal flow at desktop, portrait and landscape sizes, serve the repository on a disposable local origin and run `tests/round-review-qa.html`; it writes practice fixtures to that origin's browser storage.
 
+## Guided rules
+
+Both rules dialogs open with a Mongolian introduction and four illustrated lessons: leading, defending, pickup, and Унтана. The shared `dist/rules-guide.js` module mounts from the table chrome, with isolated styles in `dist/rules-guide.css`. Full rules retain the online/practice wording and return to the current lesson; reopening starts at the introduction. Examples are static and do not read or change the match. Existing practice pause/resume and online timers are preserved.
+
 ## Run locally
 
 The client needs the game server (`server/` in the repository root). Build the engine, then start the server with `STATIC_DIR` pointing at `dist/`; see the deployment README for the full environment. `npm test` here runs the scene, presentation and character-layout tests with Node's test runner against the root `dist/engine.js`.

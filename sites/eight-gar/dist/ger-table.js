@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 import { controlIcon, setActionButton } from './control-icons.js';
 import { mountScreenWakeLock } from './screen-wake-lock.js';
+import { mountRulesGuide } from './rules-guide.js';
 const icons = Object.fromEntries(['settings','sound','muted','copy'].map(name=>[name,controlIcon(name)]));
 const brand=document.querySelector('.brand-mark');
 brand.innerHTML='<svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round" aria-hidden="true"><path d="m28 3 8 8-8 8-8-8ZM28 37l8 8-8 8-8-8ZM3 28l8-8 8 8-8 8Zm34 0 8-8 8 8-8 8ZM28 14l14 14-14 14-14-14Z"/><path d="m16 16 24 24M16 40l24-24M23 23h10v10H23Z"/></svg>';
@@ -43,6 +44,7 @@ if(explainButton){settings.querySelector('.settings-actions').append(explainButt
 mountScreenWakeLock(settings.querySelector('.settings-actions'));
 const head=document.querySelector('.header-right');
 const settingsButton=document.createElement('button');settingsButton.className='icon-button';settingsButton.innerHTML=icons.settings;settingsButton.title='Тохиргоо';settingsButton.setAttribute('aria-label','Тохиргоо');settingsButton.onclick=()=>settings.showModal();head.append(settingsButton);document.body.append(settings);
+mountRulesGuide($('rules-dialog'), settingsButton);
 // Practice audio is local. Online audio uses the existing voice control instead.
 if(document.body.classList.contains('practice-table')){
  const sound=document.createElement('button');sound.id='sound-toggle';sound.className='icon-button';let enabled=true;try{enabled=localStorage.getItem('eight-gar-sound')!=='off';}catch{}
