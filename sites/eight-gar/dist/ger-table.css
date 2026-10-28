@@ -164,11 +164,11 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .signal-buttons button[aria-pressed=true]:before{content:'✓';position:absolute;top:1px;right:4px;font-size:10px;font-weight:700}
 .ger-table .signal-label,.ger-table .signal-status{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
 .ger-table .table-utility #selection-count{display:block;position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
-/* Card-relative corner gutters keep court artwork clear at every hand/pile size. */
-.ger-table .card[data-rank=Q],.ger-table .card[data-rank=K],.ger-table .card[data-rank=J]{container-type:size}
-.ger-table .card:is([data-rank=Q],[data-rank=K],[data-rank=J]) .card-corner{left:3%;top:5%;width:21%;font-size:22cqw;line-height:1;z-index:1}
-.ger-table .card:is([data-rank=Q],[data-rank=K],[data-rank=J]) .card-corner small{font-size:17cqw;line-height:1}
-.ger-table .card:is([data-rank=Q],[data-rank=K],[data-rank=J]) .card-bottom{left:auto;top:auto;right:3%;bottom:5%}
+/* Card-relative corner gutters keep ranks and artwork inside every card. */
+.ger-table .card{container-type:size}
+.ger-table .card[data-rank] .card-corner{left:3%;top:5%;width:21%;font-size:22cqw;line-height:1;z-index:1}
+.ger-table .card[data-rank] .card-corner small{font-size:17cqw;line-height:1}
+.ger-table .card[data-rank] .card-bottom{left:auto;top:auto;right:3%;bottom:5%}
 .ger-table .card:is([data-rank=Q],[data-rank=K],[data-rank=J]) .face-emblem{inset:12% 27%}
 .ger-table .seat .seat-name .set-signals{display:flex;gap:3px;top:-22px;right:0}
 .ger-table .seat .set-signal{display:inline-flex;align-items:center;justify-content:center;border-radius:6px;min-width:20px;min-height:20px;font-size:12px;line-height:18px;background:#123d36;color:#e0fff5;border:1px solid #80dfca}
@@ -211,3 +211,44 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
  .ger-table .portrait-scene .table-stats>span{left:50%;top:auto;bottom:-16px;transform:translateX(-50%);flex-direction:row;align-items:center;gap:4px;white-space:nowrap}
  .ger-table .portrait-scene .table-stats>span .tiny-deck{display:none}
 }
+
+/* Team identity stays on the border, including during an opponent's turn. */
+.ger-table .seat.ours{--seat-team:#36cbb6;--seat-team-glow:#36cbb64d}
+.ger-table .seat.theirs{--seat-team:#efa93e;--seat-team-glow:#efa93e4d}
+.ger-table .seat:not(.seat-0),.ger-table #self-seat .seat{border:2px solid var(--seat-team)}
+.ger-table .seat.active{border-color:var(--seat-team);box-shadow:0 0 0 2px var(--seat-team-glow),0 0 20px var(--seat-team-glow)}
+.ger-table .bot-badge{display:inline-flex;align-items:center;justify-content:center;vertical-align:-.15em;color:#c6d0d4;line-height:1}
+.ger-table .bot-badge .control-icon,.ger-table .seat .seat-meta .bot-badge .control-icon{width:14px;height:14px;flex:0 0 14px}
+.ger-table .seat .bot-badge{margin-right:2px}
+.ger-table .round-meta{min-height:38px;padding:5px 14px;gap:9px}
+.ger-table .round-meta #round-label{font-size:14px;font-weight:600;color:#f7f6f3}
+.ger-table #trump-label{width:22px;min-width:22px;flex-basis:22px;height:29px}
+.ger-table #trump-label .trump-pip{font-size:23px}
+@media(max-aspect-ratio:1/1),(max-height:500px){
+ .ger-table .round-meta{min-height:32px;padding:4px 11px;gap:7px}
+ .ger-table .round-meta #round-label{font-size:12px}
+ .ger-table #trump-label{width:19px;min-width:19px;flex-basis:19px;height:25px}
+ .ger-table #trump-label .trump-pip{font-size:20px}
+}
+
+/* Fit the rotated fan, including its outer corners, inside the hand scrollport.
+   --hand-size is shared by online and practice; oversized pickups remain scrollable. */
+.ger-table .hand{padding:28px 12px 8px;align-items:flex-start;mask-image:none}
+.ger-table .hand:not(.wide-hand) .card{
+ --hand-card-height:min(calc(100cqh / 1.15),265px,calc(100cqw / (var(--hand-size,5) * .46 + .81)));
+ height:var(--hand-card-height);width:calc(var(--hand-card-height) * .65);
+ margin-left:calc(var(--hand-card-height) * -.19);
+}
+.ger-table .hand:not(.wide-hand) .card:first-child{margin-left:0}
+.ger-table .hand.wide-hand .card{height:min(100cqh,210px);width:calc(min(100cqh,210px) * .65)}
+
+/* Dense pip grids must shrink with the card, not the surrounding hand area. */
+.ger-table .card[data-rank] .pips{inset:24% 25%;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:0}
+.ger-table .card[data-rank] .pips i{font-size:min(18cqw,10cqh);line-height:1;min-width:0;min-height:0}
+.ger-table .card[data-rank] :is(.pips-2,.pips-3){grid-template-columns:minmax(0,1fr)}
+.ger-table .card[data-rank] :is(.pips-2,.pips-3) i{font-size:min(28cqw,16cqh)}
+.ger-table .card[data-rank] .card-center{font-size:40cqw}
+.ger-table .card.joker .card-corner{font-size:7cqw;line-height:1;left:6%;top:5%;width:10%;height:auto;letter-spacing:.08em}
+.ger-table .card.joker .card-bottom{left:auto;top:auto;right:6%;bottom:5%}
+.ger-table .card.joker .card-center{font-size:40cqw}
+.ger-table .card.joker .joker-label{font-size:6cqw;bottom:16%;letter-spacing:.1em}

@@ -1,5 +1,6 @@
 // One 24px vector family for every live control, including rerendered buttons.
 const paths = {
+ computer: '<rect x="3" y="3" width="18" height="13" rx="2"/><path d="M12 16v5m-4 0h8"/>',
  settings: '<path fill="currentColor" stroke="none" fill-rule="evenodd" d="m9.5 2-.6 2.2-1.5.9-2.2-.6-2.5 4.3 1.6 1.6v1.8l-1.6 1.6 2.5 4.3 2.2-.6 1.5.9.6 2.2h5l.6-2.2 1.5-.9 2.2.6 2.5-4.3-1.6-1.6v-1.8l1.6-1.6-2.5-4.3-2.2.6-1.5-.9L14.5 2Zm6.5 9.3a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>',
  sound: '<path fill="currentColor" stroke="none" d="M11 4 5.5 8H2v8h3.5L11 20Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
  muted: '<path fill="currentColor" stroke="none" d="M11 4 5.5 8H2v8h3.5L11 20Z"/><path d="m16 9 6 6m0-6-6 6"/>',
@@ -21,4 +22,23 @@ export function setActionButton(button, label, icon, after = false) {
   button.innerHTML = controlIcon(icon);
   const text = document.createElement('span'); text.className = 'control-label'; text.textContent = label;
   after ? button.prepend(text) : button.append(text);
+}
+
+/** Compact computer-player marker with a spoken label. */
+export function computerBadge() {
+  return `<span class="bot-badge" role="img" aria-label="Компьютер" title="Компьютер">${controlIcon('computer')}</span>`;
+}
+
+export function renderComputerMessage(element, message) {
+  element.replaceChildren();
+  message.split(/ \(компьютер\)/i).forEach((part, index) => {
+    if (index) {
+      const badge = document.createElement('span');
+      badge.innerHTML = computerBadge();
+      element.append(' ', badge.firstElementChild);
+    }
+    element.append(document.createTextNode(part));
+  });
+  element.title = message;
+  element.hidden = !message;
 }

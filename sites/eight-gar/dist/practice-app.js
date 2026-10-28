@@ -1,4 +1,4 @@
-import { controlIcon, setActionButton } from './control-icons.js';
+import { controlIcon, setActionButton, computerBadge } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
 import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText } from './locale-mn.js';
 import { mountOpenerSelection } from './opener-selection.js';
@@ -120,7 +120,7 @@ function renderHand(scene = state) {
     const element = cardElement(card, true);
     const position = index - (cards.length - 1) / 2;
     element.style.setProperty('--fan', `${cards.length > 9 ? 0 : position * 4}deg`);
-    element.style.setProperty('--lift', `${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * 2}px`);
+    element.style.setProperty('--lift', `calc(var(--hand-card-height,250px) * ${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * .008})`);
     hand.append(element);
   });
   hand.scrollLeft = scrollLeft;
@@ -188,7 +188,7 @@ function render(scene = state, motion = null) {
     seat.className = `seat seat-${index} ${index % 2 ? 'theirs' : 'ours'}${active ? ' active' : ''}${winning ? ' celebrating' : ''}`;
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${NAMES[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}`);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${NAMES[index]}</span></span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : NAMES[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${NAMES[index]}</span></span><span class="seat-meta" aria-label="${shownCount} хөзөр">${index > 0 ? computerBadge() : ''}${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${index === 0 && active && !motion ? 'Таны ээлж' : status}</span>`;
     if (index === 0) seat.querySelector('.avatar').replaceChildren(avatarImage(practiceAvatar));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';

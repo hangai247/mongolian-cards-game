@@ -1,5 +1,5 @@
 import { mountLobbyViewport } from './lobby-entry.js?v=lobby1';
-import { controlIcon, setActionButton } from './control-icons.js';
+import { controlIcon, setActionButton, computerBadge, renderComputerMessage } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
 import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText, seatName } from './locale-mn.js';
 import { isOpenSeat, teamGroups, switchTeamTarget } from './lobby-teams.js';
@@ -101,7 +101,7 @@ function renderHand(sceneArg = scene) {
     const element = cardElement(card, true);
     const position = index - (cards.length - 1) / 2;
     element.style.setProperty('--fan', `${cards.length > 9 ? 0 : position * 4}deg`);
-    element.style.setProperty('--lift', `${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * 2}px`);
+    element.style.setProperty('--lift', `calc(var(--hand-card-height,250px) * ${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * .008})`);
     hand.append(element);
   });
   hand.scrollLeft = scrollLeft;
@@ -141,6 +141,7 @@ function renderActions() {
   else $('guidance').textContent = canLeadThree(scene)
     ? `Та эхэлнэ. Нэг эсвэл гурван хөзөр${canLeadFive(scene) ? ', эсвэл хоёр хостой таван хөзөр' : ''} сонгоорой.`
     : 'Нэг хөзрөөр эхэлнэ. Гурваас цөөн хөзөртэй тоглогч байна.';
+  renderComputerMessage($('guidance'), $('guidance').textContent);
 }
 function seatStatus(sceneArg, index, motion, count, active, winning) {
   const info = seatInfo(index);
@@ -183,7 +184,7 @@ function render(sceneArg = scene, motion = null) {
     seat.dataset.status = status; seat.dataset.player = index;
     seat.setAttribute('aria-label', `${names[index]}, ${index % 2 ? 'эсрэг баг' : 'танай баг'}, ${shownCount} хөзөр${active ? ', одоогийн ээлж' : ''}${offline ? ', холболтгүй' : ''}`);
     const mic = micBadge(info, index);
-    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(info?.kind === 'bot' ? names[index].replace(/\s*\(компьютер\)$/, '') : names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
+    seat.innerHTML = `<div class="avatar">${index === 0 ? 'Т' : names[index].slice(0, 1)}</div><div class="seat-details"><span class="seat-name"><span class="seat-name-text">${escapeHtml(info?.kind === 'bot' ? names[index].replace(/\s*\(компьютер\)$/, '') : names[index])}</span>${mic}</span><span class="seat-meta" aria-label="${shownCount} хөзөр">${info?.kind === 'bot' ? computerBadge() : ''}${controlIcon('cards')}<strong class="seat-count">${shownCount}</strong></span></div><span class="player-status">${status}</span>`;
     if (index === 0 && info?.kind !== 'empty') seat.querySelector('.avatar').replaceChildren(avatarImage(info?.avatarId));
     if (index > 0) {
       const fan = document.createElement('div'); fan.className = 'opponent-hand';
@@ -218,15 +219,14 @@ function render(sceneArg = scene, motion = null) {
   layoutTablePile($('highest'));
   $('turn-label').textContent = !sceneArg ? 'ТАНЫ СУУДАЛ БЭЛЭН' : sceneArg.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : sceneArg.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : sceneArg.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${names[sceneArg.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({ pickup: 'ХӨЗӨР АВЧ БАЙНА', play: 'ХӨЗӨР ТАВЬЖ БАЙНА', refill: 'НӨӨЦӨӨС НӨХӨЖ БАЙНА', sleep: 'УНТАНА' })[motion.type];
+  renderComputerMessage($('turn-label'), $('turn-label').textContent);
   $('reserve-count').textContent = sceneArg?.reserve.length ?? 3;
   $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = sceneArg?.table.pile.length ?? 0;
   $('pile-open').disabled = animating || !sceneArg?.table.pile.length;
   $('table-message').hidden = connected || !session;
   $('table-message').textContent = 'Холболт тасарлаа. Дахин холбогдож байна…';
-  $('live-move').textContent = liveMove;
-  $('live-move').title = liveMove;
-  $('live-move').hidden = !liveMove;
+  renderComputerMessage($('live-move'), liveMove);
   renderHand(sceneArg);
   if (motion?.player === 0 && motion.beforeCounts && ['pickup','refill'].includes(motion.type)) $('hand-count').textContent = `${motion.beforeCounts[0]} хөзөр`;
   renderActions(); renderDiscussion(sceneArg); renderLobby(); renderHeader(); renderTimer(); signalControls.render();

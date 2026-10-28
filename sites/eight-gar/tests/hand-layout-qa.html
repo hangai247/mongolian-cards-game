@@ -1,0 +1,56 @@
+<!doctype html><meta charset="utf-8"><title>Hand clipping checks</title>
+<style>body{margin:0;font:14px system-ui;background:#eee}header{padding:12px}iframe{display:block;border:0}pre{max-height:160px;overflow:auto}button{padding:8px}</style>
+<header><button id="run">Check hand clipping</button> <span id="status">Ready</span><pre id="output"></pre></header>
+<iframe id="game" title="Hand layout preview" width="1440" height="900"></iframe>
+<script type="module">
+import {createDeck,createMatch} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const settle=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+async function load(count,width,height){
+ const deck=createDeck(),own=deck.slice(0,count),pool=deck.slice(count);
+ const hands=[own,...Array.from({length:7},()=>[pool.shift()])];hands[7].push(...pool);
+ const state={...createMatch(deck,0),hands,reserve:[],table:{pile:[],highest:[]}};
+ localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,byRank:false,signals:[]}));
+ frame.width=width;frame.height=height;
+ await new Promise(resolve=>{frame.onload=resolve;frame.src='../dist/practice.html?hand-qa='+Date.now();});
+ for(let i=0;i<100;i++){
+  if(frame.contentDocument.querySelectorAll('#hand .card').length===count)break;
+  await new Promise(resolve=>setTimeout(resolve,20));
+ }
+ const doc=frame.contentDocument;
+ const style=doc.createElement('style');style.textContent='.hand .card{transition:none!important}';doc.head.append(style);
+ await settle();return doc;
+}
+function check(doc,count,label){
+ const hand=doc.querySelector('#hand'),box=hand.getBoundingClientRect(),cards=[...hand.children];
+ assert(cards.length===count,label+': correct hand count');
+ assert(doc.defaultView.getComputedStyle(hand).maskImage==='none',label+': no edge fade');
+ for(const card of cards){const r=card.getBoundingClientRect();
+  assert(r.top>=box.top-1&&r.bottom<=box.bottom+1,label+': card fits vertically '+JSON.stringify({top:r.top,bottom:r.bottom,boxTop:box.top,boxBottom:box.bottom}));
+  if(count<=9)assert(r.left>=box.left-1&&r.right<=box.right+1,label+': card fits horizontally');
+ }
+ if(count<=9)assert(hand.scrollWidth<=hand.clientWidth+1,label+': entire fan fits without scrolling');
+ else {
+  hand.scrollLeft=hand.scrollWidth;const last=cards.at(-1).getBoundingClientRect();
+  assert(last.right<=box.right+1&&last.left>=box.left,label+': last card reachable');hand.scrollLeft=0;
+  assert(cards[0].getBoundingClientRect().left>=box.left,label+': first card reachable');
+ }
+}
+document.querySelector('#run').onclick=async()=>{
+ output.textContent='';status.textContent='Running';
+ try{
+  for(const [width,height] of [[320,568],[390,844],[700,900],[568,320],[844,390],[1440,900],[1920,1080]]){
+   for(const count of [1,5,6,9,20]){
+    const doc=await load(count,width,height),label=`${width}×${height}, ${count} cards`;
+    check(doc,count,label);
+    for(const card of doc.querySelectorAll('#hand .card'))card.classList.add('selected');
+    await settle();check(doc,count,label+' selected');
+    output.textContent+='✓ '+label+' — resting, selected, and scroll access\n';
+   }
+  }
+  await load(6,1440,900);status.textContent='All 35 hand layouts passed';
+ }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}
+};
+await load(6,1440,900);
+</script>
