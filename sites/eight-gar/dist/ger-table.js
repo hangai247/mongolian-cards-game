@@ -24,7 +24,7 @@ const signalSlot=document.createElement('div');signalSlot.className='signal-slot
 utility.append(signalSlot,selection,$('sort'));
 // A "?" beside the signal buttons opens the rules at the team-signal section.
 const signalHelp=document.createElement('button');signalHelp.type='button';signalHelp.className='icon-button signal-help';signalHelp.innerHTML=controlIcon('help');signalHelp.setAttribute('aria-label','Багийн дохионы тухай');signalHelp.title='Багийн дохионы тухай';
-signalHelp.onclick=()=>{$('rules-open').click();requestAnimationFrame(()=>$('rules-signals')?.scrollIntoView({block:'start'}));};
+signalHelp.onclick=()=>{$('rules-open').click();requestAnimationFrame(()=>{const section=$('rules-signals');if(!section)return;if(section.closest('.guide-full')?.hidden)$('rules-dialog').querySelector('.guide-toggle')?.click();section.scrollIntoView({block:'start'});});};
 signalSlot.append(signalHelp);
 let explainButton;
 const defensePanel=$('defense-preview');
