@@ -269,3 +269,10 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table #opening-players:not(.seated){grid-template-columns:1fr;margin:6px 0}
 .ger-table #opening-players>.opener-card{min-height:44px;flex-direction:row;gap:8px}
 .ger-table #opening-players>.opener-card .opener-avatar{display:none}
+/* Opening discussion: every teammate seat that can be chosen is framed in gold with a "choose" tag; the chosen seat is marked. */
+.ger-table .seat.choosing-opener{cursor:pointer;z-index:4;border-color:#ffd98a;border-style:dashed;box-shadow:0 0 0 2px #ffd98a33,0 0 18px #ffcf6b55;animation:opener-invite 1.6s ease-in-out infinite}
+.ger-table .seat.choosing-opener:hover{background:linear-gradient(150deg,#3a4d3dea,#1a2a22f0);border-style:solid}
+.ger-table .seat.choosing-opener:after{content:'Сонгох';position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:4px;padding:2px 9px;border-radius:9px;border:1px solid #ffd98aaa;background:#3b2c10f2;color:#ffe3a3;font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;pointer-events:none}
+.ger-table .seat.choosing-opener:has([aria-checked=true]){border-style:solid;animation:none}
+.ger-table .seat.choosing-opener:has([aria-checked=true]):after{content:'Эхлэгч ✓';background:#0f5a50f2;border-color:#5fffe4aa;color:#c8fff6}
+@keyframes opener-invite{50%{box-shadow:0 0 0 4px #ffd98a55,0 0 26px #ffcf6b88}}

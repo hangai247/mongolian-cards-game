@@ -14,7 +14,13 @@ import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
 const $ = id => document.getElementById(id);
-const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null; } });
+const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
+// The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
+function renderConfirmOpener() {
+  const chosen = openerSelection.value;
+  $('confirm-opener').disabled = chosen === null;
+  $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${NAMES[chosen]} эхэлнэ · батлах →`;
+}
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const STORAGE = 'naiman-gar-practice-v1';
@@ -295,12 +301,12 @@ function renderDiscussion(scene = state) {
   const ours = scene.openingTeam === 0;
   $('discussion-title').textContent = ours ? 'Танай баг эхэлнэ.' : 'Эсрэг баг эхэлнэ.';
   $('discussion-copy').textContent = ours
-    ? 'Багтайгаа ярилцаад эхлэх тоглогчийн суудлыг сонгоорой.'
+    ? 'Эхлэгчээ сонгоорой: доорх «Та» эсвэл дээрх багийн гишүүний суудал дээр дарна уу.'
     : 'Хөзөр тараагдсан. Эсрэг баг эхлэх тоглогчоо сонгоно.';
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
   openerSelection.render({ key: scene.round, entries: [0, 2, 4, 6].map(seat => ({ seat, name: NAMES[seat], count: scene.hands[seat].length })), busy: !ours });
-  $('confirm-opener').disabled = openerSelection.value === null;
+  renderConfirmOpener();
 }
 function startMatch() {
   openerSelection.reset();

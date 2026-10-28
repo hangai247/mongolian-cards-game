@@ -25,7 +25,13 @@ const lobbyPicker = mountAvatarPicker($('lobby-avatar-picker'), { onChange: asyn
   try { await client.request('room:setAvatar', { avatarId }); rememberAvatar(avatarId); entryPicker.setValue(avatarId); }
   catch (error) { throw new Error(errorText(error)); }
 } });
-const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange() { $('confirm-opener').disabled = openerSelection.value === null || confirmPending || !connected; } });
+const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
+// The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
+function renderConfirmOpener() {
+  const chosen = openerSelection.value;
+  $('confirm-opener').disabled = chosen === null || confirmPending || !connected;
+  $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${chosen === 0 ? 'Та' : names[chosen].replace(/\s*\(компьютер\)$/, '')} эхэлнэ · батлах →`;
+}
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
 const NAME_KEY = 'gar:name', SORT_KEY = 'gar:byRank';
 const ENGINE_EVENTS = new Set(['played', 'picked-up', 'refilled', 'table-slept']);
@@ -592,13 +598,13 @@ function renderDiscussion(sceneArg = scene) {
   const ours = sceneArg.openingTeam === 0;
   $('discussion-title').textContent = ours ? 'Танай баг эхэлнэ.' : 'Эсрэг баг эхэлнэ.';
   $('discussion-copy').textContent = ours
-    ? 'Дуут сувгаар ярилцаад эхлэх тоглогчийн суудлыг сонгоорой.'
+    ? 'Эхлэгчээ сонгоорой: доорх «Та» эсвэл дээрх багийн гишүүний суудал дээр дарна уу.'
     : 'Хөзөр тараалаа. Эсрэг баг эхлэх тоглогчоо сонгож байна.';
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
   if (ours) {
     openerSelection.render({ key: `${session?.code}:${sceneArg.round}:${me}`, entries: [0, 2, 4, 6].map(seat => ({ seat, name: seat === 0 ? 'Та' : names[seat], count: sceneArg.hands[seat].length })), busy: confirmPending || !connected });
-    $('confirm-opener').disabled = openerSelection.value === null || confirmPending || !connected;
+    renderConfirmOpener();
   }
   updateDiscussionCountdown();
 }
