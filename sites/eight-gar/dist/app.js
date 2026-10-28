@@ -37,7 +37,9 @@ let scene = null, selected = new Set(), liveMove = '', byRank = false, toastTime
 let animating = false, motionController = null, motionEpoch = 0, motionText = '', rosterDirty = false;
 let pendingUpdates = [], processing = false;
 // Timers from the server (epoch ms on the server clock)
-let deadline = null, timerKind = null, reviewUntil = null;
+let deadline = null, deadlineSpan = null, timerKind = null, reviewUntil = null;
+// The server sends only the deadline, so countdown rings measure from the moment a new deadline arrives.
+function setDeadline(value) { if (value !== deadline) deadlineSpan = value === null ? null : Math.max(1000, value - serverNow()); deadline = value; }
 // Voice
 let voice = null, voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }, speakingIds = new Set(), voiceMembers = new Map();
 const MIC_KEY = 'gar:mic';
@@ -286,7 +288,9 @@ function renderTimer() {
   const text = scene.phase === 'choosing-leader' ? `Шийдвэр гаргах: ${clock}` : `${scene.turn === 0 ? 'Таны хугацаа' : 'Хугацаа'} ${clock}`;
   if (text !== lastTimerText) { timer.textContent = text; lastTimerText = text; }
   timer.classList.toggle('urgent', left <= 10 && scene.turn === 0);
-  timer.closest('.turn-hud')?.style.setProperty('--turn-progress', `${Math.min(100, left / 180 * 100)}%`);
+  const progress = `${Math.min(100, Math.max(0, deadline - serverNow()) / deadlineSpan * 100)}%`;
+  timer.closest('.turn-hud')?.style.setProperty('--turn-progress', progress);
+  document.querySelector('#seats .seat.active')?.style.setProperty('--turn-progress', progress);
 }
 function tick() {
   if (session) { renderTimer(); updateRoundControls(); updateDiscussionCountdown(); }
@@ -486,7 +490,7 @@ function onRoomState(payload) {
   if (room.seats[me]?.avatarId) { rememberAvatar(room.seats[me].avatarId); entryPicker.setValue(room.seats[me].avatarId); }
   maybeJoinVoice();
   if (payload.game) {
-    deadline = payload.game.deadline; timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
+    setDeadline(payload.game.deadline); timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
     const incoming = payload.game.view;
     const known = latestView && latestView.revision === incoming.revision && latestView.round === incoming.round;
     if (!known) {
@@ -503,7 +507,7 @@ function onRoomState(payload) {
   render(); maybeShowRound();
 }
 function onGameUpdate(update) {
-  latestView = update.view; deadline = update.deadline; timerKind = update.timer; reviewUntil = update.reviewUntil;
+  latestView = update.view; setDeadline(update.deadline); timerKind = update.timer; reviewUntil = update.reviewUntil;
   pendingUpdates.push(update);
   processQueue();
 }

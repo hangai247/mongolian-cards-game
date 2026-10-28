@@ -1,8 +1,9 @@
 /** Mongolian presentation only. Engine values, protocol codes and saved data stay in English. */
+import { AVATARS, botAvatar } from './rules/avatars.js';
+
 export const SUIT_LABELS = Object.freeze({ hearts: 'Бундан', diamonds: 'Дөрвөлжин', spades: 'Гил', clubs: 'Цэцэг' });
 export const JOKER_LABELS = Object.freeze({ gray: 'Саарал', black: 'Хар', red: 'Улаан' });
 const RANK_LABELS = { J: 'боол', Q: 'хатан', K: 'ноён', A: 'тамга' };
-const BOT_NAMES = ['Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу', 'Заяа'];
 
 export function cardLabel(card) {
   return card.kind === 'joker' ? `${JOKER_LABELS[card.color]} жокер` : `${SUIT_LABELS[card.suit]} ${RANK_LABELS[card.rank] ?? card.rank}`;
@@ -11,7 +12,8 @@ export function cardLabel(card) {
 export function seatName(info) {
   if (!info || info.kind === 'empty') return 'Сул суудал';
   // Human names, including disconnected players' reserved seats, are user content.
-  if (info.kind === 'bot' && !info.reservedForName) return `${BOT_NAMES[info.seat] ?? 'Тоглогч'} (компьютер)`;
+  // A computer is named after the face it is drawn with, as in practice.
+  if (info.kind === 'bot' && !info.reservedForName) return `${AVATARS.find(avatar => avatar.id === botAvatar(info.seat))?.name ?? 'Тоглогч'} (компьютер)`;
   return info.name ?? info.reservedForName ?? 'Тоглогч';
 }
 

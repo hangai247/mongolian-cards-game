@@ -1,14 +1,15 @@
 /** Everything a client may see. Hands other than the viewer's never pass through here. */
-import { normalizeAvatar, botAvatar } from 'mongolian-eight-gar-engine/avatars';
+import { AVATAR_IDS, normalizeAvatar, botAvatar } from 'mongolian-eight-gar-engine/avatars';
 import { TEAMS, viewForPlayer, type Event as EngineEvent } from 'mongolian-eight-gar-engine';
 import type { Timing } from '../config.js';
 import type { ClientEvent, GameInfo, PublicRoomInfo, RoomStatePayload, SeatInfo } from '../protocol.js';
 import type { RoomSnapshot } from './model.js';
 import { reconcileSignals, signalsForPlayer } from 'mongolian-eight-gar-engine/signals';
 
-const BOT_NAMES = ['Temu', 'Bataa', 'Sarnai', 'Anu', 'Bold', 'Naraa', 'Oyu', 'Zaya'];
+// Indexed like AVATAR_IDS: a computer is named after the face it is drawn with.
+const BOT_NAMES = ['Temu', 'Bataa', 'Sarnai', 'Anu', 'Bold', 'Naraa', 'Oyu'];
 export function botName(seat: number): string {
-  return `${BOT_NAMES[seat] ?? 'Bot'} (computer)`;
+  return `${BOT_NAMES[AVATAR_IDS.indexOf(botAvatar(seat))] ?? 'Bot'} (computer)`;
 }
 
 export function seatInfos(snapshot: RoomSnapshot): SeatInfo[] {
