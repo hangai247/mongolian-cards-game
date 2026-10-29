@@ -4,6 +4,35 @@ import { analyzeDefense, beatsSet, beatsCard, createDeck, shuffleDeck } from '..
 import { h, s, d, b, j, fixture, play, random } from './helpers.mjs';
 const mapping = (cards, targets) => analyzeDefense(cards, targets, 'hearts').assignments.map(({candidateIndex,targetIndex}) => [targets[targetIndex].id,cards[candidateIndex].id]);
 
+function permutations(cards) {
+  return cards.length ? cards.flatMap((card, index) => permutations(cards.filter((_, i) => i !== index)).map(rest => [card, ...rest])) : [[]];
+}
+for (const size of [3, 5]) test(`${size}-card plays commit the preview pairing regardless of selection order`, () => {
+  const targets = [s('7'), h('7'), b('7'), s('8'), d('7')].slice(0, size);
+  const cards = [h('8'), s('9'), b('8'), s('10'), d('8')].slice(0, size);
+  const expected = analyzeDefense(cards, targets, 'hearts').assignments.map(({candidateIndex}) => cards[candidateIndex]);
+  const before = fixture({hands: {0: [...cards, d('A')]}, pile: targets, highest: targets, size: 1});
+  const snapshot = JSON.stringify(before);
+  for (const selection of permutations(cards)) {
+    const originalSelection = [...selection];
+    const {state, events} = play(before, selection);
+    assert.deepEqual(state.table.highest, expected);
+    assert.deepEqual(state.table.pile, [...targets, ...expected]);
+    assert.deepEqual(events.find(event => event.type === 'played').cards, expected);
+    assert(expected.every((card, index) => beatsCard(card, targets[index], before.trump)));
+    assert.deepEqual(selection, originalSelection);
+  }
+  assert.equal(JSON.stringify(before), snapshot);
+});
+
+test('successive defenses stay in the same target columns', () => {
+  const targets = [s('7'), h('7'), b('7')];
+  const first = [h('8'), b('8'), s('8')], second = [b('9'), s('9'), h('9')];
+  const before = fixture({hands: {0: [...first, d('A')], 1: [...second, d('K')]}, pile: targets, highest: targets, size: 1});
+  const next = play(play(before, first).state, second).state;
+  assert.deepEqual(next.table.pile, [...targets, s('8'), h('8'), b('8'), s('9'), h('9'), b('9')]);
+});
+
 test('defense preview finds the complete matching when the first trump choice would fail', () => {
   const cards=[h('8'),s('8'),b('8')], targets=[s('7'),h('7'),b('7')];
   const result=analyzeDefense(cards,targets,'hearts');

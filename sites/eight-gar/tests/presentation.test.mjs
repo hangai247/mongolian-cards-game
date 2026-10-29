@@ -2,8 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createDeck,createMatch,applyAction,RANKS} from '../../../dist/engine.js';
 import {transitionSteps,fanLayout} from '../dist/presentation.js';
+import {fixture, h, s, b, d} from '../../../test/helpers.mjs';
 function conserved(s){const cards=[...s.hands.flat(),...s.reserve,...s.table.pile,...s.sleeping];assert.equal(cards.length,43);assert.equal(new Set(cards.map(c=>c.id)).size,43);}
 function verify(before,action){const frozen=JSON.stringify(before);const result=applyAction(before,{...action,player:before.turn,expectedRevision:before.revision});const steps=transitionSteps(before,result.events);assert.equal(JSON.stringify(before),frozen);for(const step of steps){conserved(step.before);conserved(step.after);}for(const key of ['hands','reserve','table','sleeping'])assert.deepEqual(steps.at(-1).after[key],result.state[key]);return {steps,result};}
+test('defense animation lands each card in the column of the card it beats', () => {
+  const targets = [s('7'), h('7'), b('7')], selected = [h('8'), b('8'), s('8')];
+  const before = fixture({hands: {0: [...selected, d('A')]}, pile: targets, highest: targets, size: 1});
+  const {steps} = verify(before, {type: 'play', cards: selected.map(card => card.id)});
+  const expected = [s('8'), h('8'), b('8')];
+  assert.deepEqual(steps[0].cards, expected);
+  assert.deepEqual(steps[0].after.table.pile, [...targets, ...expected]);
+});
 test('a lead and automatic draw animate in engine order without losing or duplicating cards',()=>{
   const before=createMatch(createDeck(),0);const {steps}=verify(before,{type:'play',cards:[before.hands[0][0].id]});
   assert.deepEqual(steps.map(s=>s.type),['play','refill']);assert.equal(steps[0].after.hands[0].length,4);assert.equal(steps[1].after.hands[0].length,5);

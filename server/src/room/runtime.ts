@@ -45,6 +45,7 @@ export type Outcome =
   | { readonly ok: false; readonly code: ErrorCode; readonly message: string };
 
 const CACHE_LIMIT = 64;
+const TIMER_RETRY_MS = 1000;
 
 export class RoomRuntime {
   private snapshot: RoomSnapshot;
@@ -158,7 +159,7 @@ export class RoomRuntime {
   }
 
   /** Re-arms timers from the snapshot so they are a pure function of persisted state. */
-  private syncTimers(): void {
+  private syncTimers(retryDelayMs = 0): void {
     if (this.disposed) return;
     const { clock, timing } = this.deps;
     const game = this.snapshot.game;
@@ -168,8 +169,17 @@ export class RoomRuntime {
       const key = `${timer}:${game.deadline}:${revision}`;
       if (this.gameTimer?.key !== key) {
         if (this.gameTimer) clock.clearTimeout(this.gameTimer.handle);
-        const delay = Math.max(0, game.deadline - clock.now());
-        this.gameTimer = { key, handle: clock.setTimeout(() => { void this.enqueue({ type: 'timer', timer, revision }); }, delay) };
+        const delay = Math.max(retryDelayMs, game.deadline - clock.now());
+        this.gameTimer = { key, handle: clock.setTimeout(() => {
+          void this.enqueue({ type: 'timer', timer, revision }).then(outcome => {
+            // Failed persistence leaves the snapshot unchanged, but this timeout
+            // has already fired. Retry only if no newer transition owns the timer.
+            if (!outcome.ok && outcome.code === 'SERVER_ERROR' && this.gameTimer?.key === key) {
+              this.gameTimer = null;
+              this.syncTimers(TIMER_RETRY_MS);
+            }
+          });
+        }, delay) };
       }
     } else if (this.gameTimer) {
       clock.clearTimeout(this.gameTimer.handle);
@@ -183,10 +193,17 @@ export class RoomRuntime {
       if (existing?.offlineSince === player.offlineSince) continue;
       if (existing) clock.clearTimeout(existing.handle);
       const offlineSince = player.offlineSince;
-      const delay = Math.max(0, offlineSince + timing.botTakeoverMs - clock.now());
+      const delay = Math.max(retryDelayMs, offlineSince + timing.botTakeoverMs - clock.now());
       this.takeoverTimers.set(player.id, {
         offlineSince,
-        handle: clock.setTimeout(() => { void this.enqueue({ type: 'bot-takeover', playerId: player.id, offlineSince }); }, delay),
+        handle: clock.setTimeout(() => {
+          void this.enqueue({ type: 'bot-takeover', playerId: player.id, offlineSince }).then(outcome => {
+            if (!outcome.ok && outcome.code === 'SERVER_ERROR' && this.takeoverTimers.get(player.id)?.offlineSince === offlineSince) {
+              this.takeoverTimers.delete(player.id);
+              this.syncTimers(TIMER_RETRY_MS);
+            }
+          });
+        }, delay),
       });
     }
     for (const [playerId, entry] of this.takeoverTimers) {

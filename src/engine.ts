@@ -225,14 +225,18 @@ export function applyAction(state: State, action: Action): { state: State; event
       'INVALID_CARDS', 'Select distinct cards from your hand.');
     const selected = action.cards.map(id => hand.find(card => card.id === id));
     ensure(selected.every(card => card !== undefined), 'INVALID_CARDS', 'Selected card is not in your hand.');
-    const cards = selected as Card[];
+    let cards = selected as Card[];
     const lead = state.table.highest.length === 0;
     if (lead) {
       ensure(isLeadStructure(cards), 'INVALID_LEAD', 'Lead one card, a three-card pair set, or a five-card two-pair set. Jokers are single only.');
       if (cards.length === 3) ensure(canLeadThree(state), 'THREE_CARD_LEAD_BLOCKED', 'Three-card leads require every hand to have at least three cards before play.');
       if (cards.length === 5) ensure(canLeadFive(state), 'FIVE_CARD_LEAD_BLOCKED', 'Five-card leads require empty reserve and every hand at least five before play.');
     } else {
-      ensure(beatsSet(cards, state.table.highest, state.trump), 'INVALID_RESPONSE', 'Response must beat every current card with a distinct card of its own.');
+      const defense = analyzeDefense(cards, state.table.highest, state.trump);
+      ensure(defense.valid, 'INVALID_RESPONSE', 'Response must beat every current card with a distinct card of its own.');
+      // Keep each response in its target's column, using the preview's matching.
+      // Persist this order in both the pile and event so every client agrees.
+      cards = defense.assignments.map(({ candidateIndex }) => cards[candidateIndex]!);
     }
     const ids = new Set(action.cards);
     hands[action.player] = hand.filter(card => !ids.has(card.id));

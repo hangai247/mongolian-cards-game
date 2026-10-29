@@ -149,3 +149,51 @@ test('a persistence failure drops the transition and reports SERVER_ERROR', asyn
   assert.equal(runtime.current(), before);
   assert.equal(sockets.p0.received.length, seen, 'no emit after a failed commit');
 });
+
+test('a failed automatic turn retries without emitting an uncommitted move or spinning', async () => {
+  const { runtime, clock, repo, sockets } = await table({ humans: 8 });
+  const commit = repo.commit.bind(repo);
+  let failed = true, attempts = 0;
+  repo.commit = async (...args) => { attempts++; if (failed) throw Error('temporary outage'); return commit(...args); };
+  const before = runtime.current(), seen = sockets.p0.received.length;
+  await clock.advance(before.game.deadline - clock.now());
+  assert.equal(runtime.current(), before);
+  assert.equal(sockets.p0.received.length, seen);
+  assert.equal(attempts, 1);
+  await clock.advance(999);
+  assert.equal(attempts, 1, 'retry is delayed');
+  failed = false;
+  await clock.advance(1);
+  assert.equal(runtime.current().game.state.revision, before.game.state.revision + 1);
+  assert.equal(attempts, 2);
+  runtime.close('evicted');
+  assert.equal(clock.pending(), 0);
+});
+
+test('failed bot takeover retries, and reconnect cancels the pending retry', async () => {
+  const { runtime, clock, repo, sockets } = await table({ humans: 2 });
+  await runtime.detach('p1', sockets.p1);
+  const commit = repo.commit.bind(repo);
+  repo.commit = async (snapshot, audit) => {
+    if (snapshot.seats[1].kind === 'bot') throw Error('temporary outage');
+    return commit(snapshot, audit);
+  };
+  await clock.advance(timing.botTakeoverMs);
+  assert.equal(runtime.current().seats[1].kind, 'human');
+  repo.commit = commit;
+  await clock.advance(1000);
+  assert.equal(runtime.current().seats[1].kind, 'bot');
+  await runtime.attach('p1', sockets.p1);
+  await runtime.detach('p1', sockets.p1);
+  repo.commit = async (snapshot, audit) => {
+    if (snapshot.seats[1].kind === 'bot') throw Error('temporary outage');
+    return commit(snapshot, audit);
+  };
+  await clock.advance(timing.botTakeoverMs);
+  repo.commit = commit;
+  await runtime.attach('p1', sockets.p1);
+  await clock.advance(1000);
+  assert.equal(runtime.current().seats[1].kind, 'human');
+  runtime.close('evicted');
+  assert.equal(clock.pending(), 0);
+});
