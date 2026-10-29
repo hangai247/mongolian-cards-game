@@ -6,7 +6,7 @@ The shared catalog is `src/avatars.ts`, exposed as `mongolian-eight-gar-engine/a
 
 Migration `server/sql/002_player_avatars.sql` adds the defaulted, constrained `players.avatar_id` column. Startup applies it using the existing migration runner. Repositories persist/read this field. Back up production data and use the existing deployment process when publishing; this change was prepared and tested locally only.
 
-The renderer uses seven still WebP cutouts, a people-free room and a foreground copy clipped along the table edge. All placement derives from `room-layout.js`. The current first-person viewpoint, card animations and rules are retained. A local avatar chip stays visible even when the opener-only self-seat badge is hidden. Missing character assets use the seat portrait; missing portraits display initials.
+The renderer uses eighteen still WebP cutouts, a people-free room and a foreground copy clipped along the table edge. The eleven additional portraits and user-provided names are documented in [friends-avatars.md](friends-avatars.md); migrations `003_friends_avatars.sql` and `004_amraa_anu_avatars.sql` extend the database allowlist. All placement derives from `room-layout.js`. The current first-person viewpoint, card animations and rules are retained. A local avatar chip stays visible even when the opener-only self-seat badge is hidden. Missing character assets use the seat portrait; missing portraits display initials.
 
 ## Verification
 

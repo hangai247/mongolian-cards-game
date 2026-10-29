@@ -34,4 +34,5 @@ test('every avatar uses the same seat geometry from each viewer, including dupli
     }
   }
   assert.equal(new Set(Array.from({length:7},(_,i)=>botAvatar(i+1))).size,7);
+  assert.equal(botAvatar(0),'oyu','seat zero keeps its existing bot identity as the player catalog grows');
 });

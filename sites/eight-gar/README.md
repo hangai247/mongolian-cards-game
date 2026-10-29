@@ -50,6 +50,8 @@ The client needs the game server (`server/` in the repository root). Build the e
 
 ## Private set signals and practice
 
+Open `practice.html?table=friends` for the prepared friends table. Its seven computer-controlled seats, from left to right, use Ану (`anu-friend`), Тэгшээ, Доожий, Хүслээ, Энгүүж, Уугий, and Амраа. The viewer chooses the eighth avatar normally. The friends table saves under `naiman-gar-practice-friends-v1`, independently of the ordinary practice match; names and portraits stay aligned through reloads and new rounds.
+
 Run the root `npm run build` before serving the browser files; it copies the shared compiled engine, strategy and signal helpers into `dist/rules/`. `practice.html` preserves the local game separately from the online landing page, including its existing browser save key. Signal controls are in the hand area and stay available during opening discussion and other players’ turns. Only teammates receive name badges. Active signals survive reloads, and older saves continue to load with no declarations.
 
 The common `team-signals.js` controls accept only a viewer’s hand and filtered team declarations. Online callers must rotate real seats to display seats before rendering, while sending the actual game revision to `game:signal`. A private update must refresh signal controls without resetting the move animation, opening-player selection, or turn countdown.

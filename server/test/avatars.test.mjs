@@ -12,7 +12,7 @@ const timing = { turnMs: 60000, leaderMs: 60000, roundReviewMs: 0, roundOverMs: 
 const ctx = { now: Date.now(), random: () => .37, timing };
 const makeRoom = () => createRoom({ id: 'test-room', code: 'ABC234', hostPlayerId: 'p0', hostName: 'Host', avatarId: 'oyu', now: ctx.now });
 const move = (room, command) => applyCommand(room, command, ctx).snapshot;
-test('avatar schema accepts seven presets and defaults old clients; refuses arbitrary IDs, URLs and spoofed owners', () => {
+test('avatar schema accepts every preset and defaults old clients; refuses arbitrary IDs, URLs and spoofed owners', () => {
   for (const avatarId of AVATAR_IDS) assert(CreateRoomBody.safeParse({ name: 'A', avatarId }).success);
   assert.equal(JoinRoomBody.parse({ name: 'Old' }).avatarId, 'temu');
   for (const avatarId of ['../../file', 'https://example.com/a.png', '', null, 123]) assert(!CreateRoomBody.safeParse({ name: 'A', avatarId }).success);

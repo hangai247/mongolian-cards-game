@@ -16,6 +16,7 @@ import { reconcileHand } from './hand-view.js';
 import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
+import { AVATARS } from './rules/avatars.js';
 const $ = id => document.getElementById(id);
 const sleepNotice = createSleepNotice(() => { if (!animating) render(); });
 const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
@@ -25,9 +26,14 @@ function renderConfirmOpener() {
   $('confirm-opener').disabled = chosen === null || animating;
   $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${NAMES[chosen]} эхэлнэ · батлах →`;
 }
-const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
+// A dedicated table link keeps this lineup and its saved match separate from regular practice.
+const friendsTable = new URLSearchParams(location.search).get('table') === 'friends';
+const tableAvatars = friendsTable
+  ? ['anu-friend', 'tegshee', 'doojii', 'khuslee', 'enguuj', 'uugii', 'amraa']
+  : Array.from({ length: 7 }, (_, index) => botAvatar(index + 1));
+const NAMES = ['Та', ...tableAvatars.map(id => AVATARS.find(avatar => avatar.id === id).name)];
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
-const STORAGE = 'naiman-gar-practice-v1';
+const STORAGE = friendsTable ? 'naiman-gar-practice-friends-v1' : 'naiman-gar-practice-v1';
 let practiceAvatar = normalizeAvatar(rememberedAvatar());
 const practicePicker = mountAvatarPicker($('practice-avatar-picker'), { value: rememberedAvatar(), onChange: rememberAvatar });
 const newPicker = mountAvatarPicker($('new-avatar-picker'), { value: rememberedAvatar(), onChange: rememberAvatar });
@@ -197,7 +203,7 @@ function render(scene = state, motion = null) {
     $('seats').append(seat);
   }
   renderTableInsights({ scene, motion, counts: shownCounts, names: NAMES, paused, animating });
-  characterRoom.update({avatars: Array.from({length: 8}, (_, index) => index === 0 ? practiceAvatar : botAvatar(index)), handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
+  characterRoom.update({avatars: [practiceAvatar, ...tableAvatars], handCounts:shownCounts, phase:scene?.phase, turn:scene?.turn, winner:scene?.winner, paused, motionEnabled: motionEnabled()}, motion);
   $('highest').replaceChildren();
   $('pile-key').hidden = !scene?.table.pile.length;
   if (scene?.table.pile.length) {

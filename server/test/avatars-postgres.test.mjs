@@ -6,6 +6,7 @@ import { createPool } from '../dist/db/pool.js';
 import { migrate } from '../dist/db/migrate.js';
 import { PgRepository } from '../dist/db/repo.js';
 import { createRoom, applyCommand } from '../dist/room/reducer.js';
+import { AVATAR_IDS } from '../../dist/avatars.js';
 const url=process.env.AVATAR_TEST_DATABASE_URL;
 // An explicit disposable database is required; never infer a production DATABASE_URL.
 test('Postgres migration upgrades old players and persists avatar updates across repository restart', {skip:!url}, async () => {
@@ -21,13 +22,19 @@ test('Postgres migration upgrades old players and persists avatar updates across
     await scoped.query('INSERT INTO players (id,room_id,display_name,seat,last_seen_at) VALUES ($1,$2,$3,0,now())',[old.hostPlayerId,old.id,'Legacy']);
     await migrate(scoped,{info(){}});
     assert.equal((await scoped.query('SELECT avatar_id FROM players')).rows[0].avatar_id,'temu');
+    // All catalog entries must pass the database allowlist, including the new portraits.
+    for (const avatarId of AVATAR_IDS) {
+      await scoped.query('UPDATE players SET avatar_id=$1', [avatarId]);
+      assert.equal((await scoped.query('SELECT avatar_id FROM players')).rows[0].avatar_id,avatarId);
+    }
+    await scoped.query("UPDATE players SET avatar_id='temu'");
     await migrate(scoped,{info(){}}); // Re-running migrations is safe.
     const restored=(await repo.loadActiveRooms(0))[0];
     assert.equal(restored.players[old.hostPlayerId].avatarId,'temu');
-    const updated=applyCommand(restored,{type:'set-avatar',playerId:old.hostPlayerId,avatarId:'oyu'},{now:Date.now(),random:()=>.5,timing:{}}).snapshot;
+    const updated=applyCommand(restored,{type:'set-avatar',playerId:old.hostPlayerId,avatarId:'sonio'},{now:Date.now(),random:()=>.5,timing:{}}).snapshot;
     await repo.commit(updated,null);
     const secondPool=createPool(scopedUrl.toString()), secondRepo=new PgRepository(secondPool);
-    try { assert.equal((await secondRepo.loadActiveRooms(0))[0].players[old.hostPlayerId].avatarId,'oyu'); } finally {await secondRepo.close();}
+    try { assert.equal((await secondRepo.loadActiveRooms(0))[0].players[old.hostPlayerId].avatarId,'sonio'); } finally {await secondRepo.close();}
     await assert.rejects(scoped.query("UPDATE players SET avatar_id='bad'"),e=>e.code==='23514');
   } finally { await repo.close();await pool.query(`DROP SCHEMA ${schema} CASCADE`);await pool.end(); }
 });

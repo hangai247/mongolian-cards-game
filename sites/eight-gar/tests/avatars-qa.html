@@ -54,7 +54,8 @@ async function gallery(portrait){
   figure.append(caption,f);root.append(figure);
  }
  await waitFor(()=>[...root.querySelectorAll('iframe')].every(f=>f.contentDocument?.querySelectorAll('.room-actor').length===7&&[...f.contentDocument.querySelectorAll('.room-actor')].every(i=>i.complete&&i.naturalWidth&&!i.hidden)));
- assert(true,'All 49 character/seat combinations loaded, including duplicate avatars');status.textContent='PASS · 49 combinations · '+(portrait?'portrait':'wide');
+ const combinations=AVATARS.length*7;
+ assert(true,`All ${combinations} character/seat combinations loaded, including duplicate avatars`);status.textContent=`PASS · ${combinations} combinations · `+(portrait?'portrait':'wide');
 }
 document.querySelector('#wide').onclick=()=>gallery(false);document.querySelector('#portrait').onclick=()=>gallery(true);
 </script></html>
