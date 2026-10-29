@@ -13,7 +13,8 @@ import { transitionSteps, fanLayout } from './presentation.js';
 import { animateStep } from './motion.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
 import * as net from './net.js';
-import { createVoice } from './voice.js';
+import { createVoice } from './voice.js?v=levels1';
+import { setSpeakingIndicator } from './speaking-indicator.js?v=levels1';
 import { createOnlineSignalControls } from './online-signals.js';
 
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, avatarImage, renderSelfAvatar } from './avatar-picker.js';
@@ -49,16 +50,17 @@ let deadline = null, deadlineSpan = null, timerKind = null, reviewUntil = null;
 // The server sends only the deadline, so countdown rings measure from the moment a new deadline arrives.
 function setDeadline(value) { if (value !== deadline) deadlineSpan = value === null ? null : Math.max(1000, value - serverNow()); deadline = value; }
 // Voice
-let voice = null, voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }, speakingIds = new Set(), voiceMembers = new Map();
+let voice = null, voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }, speakingIds = new Set(), speakingLevels = new Map(), voiceMembers = new Map();
 const MIC_KEY = 'gar:mic';
 // Pending intents
 let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
 const signalControls = createOnlineSignalControls({ container: document.querySelector('.hand-zone'), onError: toast });
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=avatars1').then(({ CharacterRoom }) => {
+import('./photographic-room.js?v=speaking2').then(({ CharacterRoom }) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
+  applySpeaking();
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
 
 function defaultNames() { return ['Та', '2-р суудал', '3-р суудал', '4-р суудал', '5-р суудал', '6-р суудал', '7-р суудал', '8-р суудал']; }
@@ -237,6 +239,7 @@ function render(sceneArg = scene, motion = null) {
   renderHand(sceneArg);
   if (motion?.player === 0 && motion.beforeCounts && ['pickup','refill'].includes(motion.type)) $('hand-count').textContent = `${motion.beforeCounts[0]} хөзөр`;
   renderActions(); renderDiscussion(sceneArg); renderLobby(); renderHeader(); renderTimer(); signalControls.render();
+  applySpeaking();
 }
 function escapeHtml(text) { return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
@@ -318,8 +321,10 @@ function applySpeaking() {
   for (let index = 0; index < 8; index++) {
     const info = seatInfo(index);
     const speaking = !!(info?.playerId && speakingIds.has(info.playerId));
-    document.querySelector(`.seat-${index}`)?.classList.toggle('speaking', speaking);
-    document.querySelector(`.seat-row[data-display="${index}"]`)?.classList.toggle('speaking', speaking);
+    const level = speakingLevels.get(info?.playerId) ?? 0;
+    setSpeakingIndicator(document.querySelector(`.seat-${index}`), speaking, '.seat-meta', level);
+    setSpeakingIndicator(document.querySelector(`.seat-row[data-display="${index}"]`), speaking, '.seat-tags', level);
+    if (index === 0) setSpeakingIndicator($('self-avatar-chip'), speaking, null, level);
   }
 }
 
@@ -485,7 +490,7 @@ function enterRoom(result) {
     if (info.state === 'error' && !voiceOutage) { voiceOutage = true; toast('Дуут холболт тасарлаа. Дахин холбогдож байна…'); }
     if (!animating) render();
   });
-  voice.onSpeakers(ids => { speakingIds = new Set(ids); applySpeaking(); });
+  voice.onSpeakers((ids, levels) => { speakingIds = new Set(ids); speakingLevels = levels; applySpeaking(); });
   voice.onParticipants(members => { voiceMembers = members; if (!animating) render(); });
   render();
 }
@@ -494,7 +499,7 @@ function leaveLocally(message) {
   signalControls.close();
   if (session) net.clearSession(session.code);
   client?.close(); client = null;
-  voice?.leave(); voice = null; voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }; speakingIds = new Set(); voiceMembers = new Map();
+  void voice?.destroy(); voice = null; voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }; speakingIds = new Set(); speakingLevels = new Map(); voiceMembers = new Map();
   motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = []; processing = false;
   session = null; room = null; latestView = null; scene = null; me = 0; names = defaultNames(); connected = false;
   deadline = null; timerKind = null; reviewUntil = null; liveMove = ''; selected.clear(); pendingAction = null;

@@ -4,7 +4,8 @@ import { Room, RoomEvent, Track } from './vendor/livekit-client.esm.mjs';
 
 const REJOIN_DELAYS_MS = [1000, 3000, 8000];
 
-export function createVoice({ requestToken, micPreferred = false }) {
+export function createVoice({ requestToken, micPreferred = false, createRoom = options => new Room(options) }) {
+  let destroyed = false;
   let room = null, state = 'off', wanted = false, micWanted = micPreferred, micOn = false, micBlocked = false, audioBlocked = false;
   let rejoinAttempt = 0, rejoinTimer = null;
   const listeners = { speakers: new Set(), state: new Set(), participants: new Set() };
@@ -26,27 +27,37 @@ export function createVoice({ requestToken, micPreferred = false }) {
     return result;
   }
   const emitParticipants = () => emit('participants', participants());
+  const emitSpeakers = (speakers = []) => {
+    // LiveKit updates audioLevel for both local and remote participants before this event.
+    const levels = new Map(speakers.map(p => [p.identity,
+      Number.isFinite(p.audioLevel) ? Math.max(0, Math.min(1, p.audioLevel)) : 0]));
+    emit('speakers', speakers.map(p => p.identity), levels);
+  };
 
   function attachRoom(current) {
-    current.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+    const on = (event, handler) => current.on(event, (...args) => {
+      if (!destroyed && current === room) handler(...args);
+    });
+    on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       if (track.kind !== Track.Kind.Audio) return;
       const element = track.attach();
       element.dataset.identity = participant.identity;
       sink.append(element);
       emitParticipants();
     });
-    current.on(RoomEvent.TrackUnsubscribed, track => { for (const element of track.detach()) element.remove(); emitParticipants(); });
+    on(RoomEvent.TrackUnsubscribed, track => { for (const element of track.detach()) element.remove(); emitParticipants(); });
     for (const event of [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.TrackPublished,
-      RoomEvent.TrackUnpublished, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted]) current.on(event, emitParticipants);
-    current.on(RoomEvent.ActiveSpeakersChanged, speakers => emit('speakers', speakers.map(p => p.identity)));
-    current.on(RoomEvent.AudioPlaybackStatusChanged, () => { audioBlocked = !current.canPlaybackAudio; setState(state); });
-    current.on(RoomEvent.MediaDevicesError, error => { console.error('voice device', error); });
-    current.on(RoomEvent.Reconnecting, () => setState('connecting'));
-    current.on(RoomEvent.Reconnected, () => setState('on'));
-    current.on(RoomEvent.Disconnected, () => {
-      emit('speakers', []);
+      RoomEvent.TrackUnpublished, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted]) on(event, emitParticipants);
+    on(RoomEvent.ActiveSpeakersChanged, emitSpeakers);
+    on(RoomEvent.AudioPlaybackStatusChanged, () => { audioBlocked = !current.canPlaybackAudio; setState(state); });
+    on(RoomEvent.MediaDevicesError, error => { console.error('voice device', error); });
+    on(RoomEvent.Reconnecting, () => { emitSpeakers(); setState('connecting'); });
+    on(RoomEvent.Reconnected, () => setState('on'));
+    on(RoomEvent.Disconnected, () => {
+      emitSpeakers();
       if (current !== room) return;
       room = null; micOn = false;
+      current.removeAllListeners(); sink.replaceChildren();
       emitParticipants();
       if (!wanted) { setState('off'); return; }
       // The SFU closed the session (token expiry, server restart): fetch a fresh token and come back.
@@ -58,10 +69,13 @@ export function createVoice({ requestToken, micPreferred = false }) {
 
   async function applyMic() {
     if (!room || state !== 'on') return micOn;
+    const current = room;
     try {
-      await room.localParticipant.setMicrophoneEnabled(micWanted);
+      await current.localParticipant.setMicrophoneEnabled(micWanted);
+      if (destroyed || current !== room) return false;
       micOn = micWanted; micBlocked = false;
     } catch (error) {
+      if (destroyed || current !== room) return false;
       // Permission refused or no device: stay in listen-only mode and let the UI offer a retry.
       console.error('microphone', error);
       micOn = false; micBlocked = micWanted;
@@ -71,7 +85,8 @@ export function createVoice({ requestToken, micPreferred = false }) {
   }
 
   async function start() {
-    const current = new Room({
+    if (destroyed || !wanted) return;
+    const current = createRoom({
       adaptiveStream: false, dynacast: false,
       audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
@@ -81,18 +96,22 @@ export function createVoice({ requestToken, micPreferred = false }) {
       const { url, token } = await requestToken();
       if (!wanted || current !== room) return;
       await current.connect(url, token);
+      if (destroyed || !wanted || current !== room) { await current.disconnect(); return; }
       rejoinAttempt = 0;
       // Autoplay policy: this succeeds silently when the page already had a gesture; otherwise the banner asks for a tap.
       try { await current.startAudio(); } catch { /* reported through canPlaybackAudio */ }
+      if (destroyed || !wanted || current !== room) return;
       audioBlocked = !current.canPlaybackAudio;
       setState('on');
       emitParticipants();
       await applyMic();
     } catch (error) {
+      if (destroyed || current !== room) return;
       console.error('voice', error);
       if (current === room) room = null;
+      current.removeAllListeners(); sink.replaceChildren();
       try { await current.disconnect(); } catch { /* already closed */ }
-      if (!wanted) return;
+      if (!wanted || destroyed) return;
       const delay = REJOIN_DELAYS_MS[Math.min(rejoinAttempt++, REJOIN_DELAYS_MS.length - 1)];
       setState('error', error);
       rejoinTimer = setTimeout(() => { rejoinTimer = null; if (wanted) start(); }, delay * 4);
@@ -106,7 +125,7 @@ export function createVoice({ requestToken, micPreferred = false }) {
     snapshot,
     /** Connects and listens. Call once when seated; reconnects on its own until leave(). */
     async join() {
-      if (wanted) return;
+      if (wanted || destroyed) return;
       wanted = true; rejoinAttempt = 0;
       setState('connecting');
       await start();
@@ -115,9 +134,17 @@ export function createVoice({ requestToken, micPreferred = false }) {
       wanted = false;
       clearTimeout(rejoinTimer); rejoinTimer = null;
       const current = room; room = null; micOn = false;
-      emit('speakers', []);
+      current?.removeAllListeners(); sink.replaceChildren();
+      emitSpeakers();
       if (current) { try { await current.disconnect(); } catch { /* ignore */ } }
       setState('off');
+    },
+    /** Retire this controller when leaving a table; stale async work cannot reach the next room. */
+    async destroy() {
+      destroyed = true;
+      for (const set of Object.values(listeners)) set.clear();
+      sink.remove();
+      await this.leave();
     },
     /** Turns the microphone on or off. The first "on" asks the browser for permission. */
     async setMic(on) {
@@ -130,8 +157,10 @@ export function createVoice({ requestToken, micPreferred = false }) {
     /** Must run inside a click: unblocks audio playback on browsers that require a gesture. */
     async resumeAudio() {
       if (!room) return;
-      try { await room.startAudio(); } catch (error) { console.error('audio playback', error); }
-      audioBlocked = !room.canPlaybackAudio;
+      const current = room;
+      try { await current.startAudio(); } catch (error) { console.error('audio playback', error); }
+      if (destroyed || current !== room) return;
+      audioBlocked = !current.canPlaybackAudio;
       setState(state);
     },
     participants,

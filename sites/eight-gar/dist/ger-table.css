@@ -295,8 +295,17 @@ body.ger-table{--glass:linear-gradient(145deg,rgba(34,40,44,.83),rgba(8,13,17,.7
 .ger-table .table-utility .voice-button{display:flex;flex-direction:column;justify-content:center;gap:2px;width:64px;min-width:64px;padding:3px;border-radius:14px}
 .ger-table .table-utility .voice-button .control-icon{width:20px;height:20px;flex-basis:20px}
 .ger-table .table-utility .voice-button:after{content:attr(data-caption);font-size:10px;line-height:12px;white-space:nowrap}
-.ger-table .seat.speaking{box-shadow:0 0 0 3px #9affeb,0 0 22px #54e9cf;outline:2px solid #173d36;outline-offset:3px}
+.ger-table .seat.speaking,.ger-table .seat-row.speaking,.ger-table #self-avatar-chip.speaking{border-color:#8debd5;box-shadow:0 0 0 1px #8debd588,0 0 calc(5px + var(--voice-level,0)*9px) rgb(84 233 207 / calc(.12 + var(--voice-level,0)*.35));transition:box-shadow 100ms linear}
 .ger-table .seat.speaking .seat-mic{background:#a9ffeb;color:#102c26}
+.speaking-wave{display:none;flex:0 0 14px;width:14px;height:11px;margin-left:0;vertical-align:middle;align-items:center;justify-content:space-between;pointer-events:none;color:#a9ffeb}
+.speaking .speaking-wave{display:inline-flex}
+.ger-table .seat.speaking .seat-meta{gap:3px}
+.speaking-wave i{display:block;width:2px;height:100%;border-radius:2px;background:currentColor;transform:scaleY(var(--voice-level,0));transition:transform 100ms linear}
+.speaking-wave i:nth-child(1){height:40%;}
+.speaking-wave i:nth-child(2){height:75%;}
+.speaking-wave i:nth-child(4){height:65%;}
+.speaking-wave i:nth-child(5){height:45%;}
+@media(prefers-reduced-motion:reduce){.speaking-wave i{transition:none}.ger-table .seat.speaking,.ger-table .seat-row.speaking,.ger-table #self-avatar-chip.speaking{transition:none}}
 .ger-table .header .icon-button,.ger-table .header #pause,.ger-table #copy-link,.ger-table .close-button{min-width:44px;min-height:44px}
 .ger-table .header #pause{font-size:12px}
 .ger-table .table-utility .signal-help{width:44px;height:44px;min-width:44px;min-height:44px}

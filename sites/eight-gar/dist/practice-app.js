@@ -60,7 +60,7 @@ function renderSignals() {
 let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0;
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=avatars1').then(({CharacterRoom}) => {
+import('./photographic-room.js?v=speaking2').then(({CharacterRoom}) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });

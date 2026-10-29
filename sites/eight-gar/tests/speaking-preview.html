@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Speaking indicator · Game preview</title>
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}button{cursor:pointer}#mic-status{flex-basis:100%;font-size:12px;color:#aed4c8}#mic-status:empty{display:none}meter{width:90px}#mic-percent{min-width:4ch}body{height:100dvh;display:flex;flex-direction:column;margin:0;background:#102c26;color:#edfdf7;font:13px system-ui}header{min-height:54px;padding:9px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}header strong{margin-right:auto}label{display:flex;align-items:center;gap:8px}button,select{background:#204d41;color:white;border:1px solid #71bda8;border-radius:7px;padding:7px}small{color:#aed4c8}iframe{display:block;width:100%;flex:1;min-height:0;border:0}@media(max-width:650px){header{gap:6px}header strong{width:100%}}
+</style>
+</head>
+<body>
+<header><strong>Speaking indicator · Playable game preview</strong><small id="source-label">Simulated voice activity</small><label>Speakers<select id="speakers"><option value="2,6">Bataa + Naraa</option><option value="2">Bataa</option><option value="0">You</option><option value="">Nobody</option></select></label><label id="volume-control">Volume <input id="volume" type="range" min="0" max="100" value="35"><output id="volume-value">35%</output></label><button id="mic-test" type="button">Test my microphone</button><span id="mic-status" role="status" aria-live="polite"></span><label id="mic-meter" hidden>Input <meter id="mic-level" min="0" max="1" value="0"></meter><output id="mic-percent">0%</output></label></header>
+<iframe id="game" title="Playable card game with speaking indicators"></iframe>
+<script type="module">
+import {createMicrophoneMeter} from './preview-microphone.js?v=mic2';
+import {createDeck,createMatch} from '../dist/rules/engine.js';
+// Use this preview on a separate local origin: its practice save is disposable.
+const cards=createDeck(),pick=(suit,rank)=>cards.find(c=>c.suit===suit&&c.rank===rank);
+const own=[pick('hearts','10'),pick('hearts','Q'),pick('diamonds','8'),pick('diamonds','Q'),pick('spades','2')];
+const pile=[pick('clubs','7'),pick('spades','7'),pick('diamonds','3')];
+const pool=cards.filter(c=>![...own,...pile].includes(c)),reserve=pool.splice(0,3),hands=[own,...Array.from({length:7},()=>pool.splice(0,4))];hands[7].push(...pool);
+const state={...createMatch(cards,0),hands,reserve,table:{pile,highest:pile}};
+localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,byRank:false,signals:[],avatarId:'temu'}));
+localStorage.setItem('eight-gar-sound','off');
+const base=new URL('../dist/',location.href).href;
+const html=await (await fetch('../dist/practice.html', {cache:'no-store'})).text();
+// Feed the same player-card indicator as online voice, from a preview-only control.
+const demo=`<style>.seat.speaking .bot-badge{display:none}</style><script type="module">
+import {CharacterRoom} from './photographic-room.js?v=speaking2';
+import {setSpeakingIndicator} from './speaking-indicator.js?v=levels1';
+let speakers=[2,6],volume=.35;
+const update=CharacterRoom.prototype.update;
+function draw(){for(let i=0;i<8;i++)setSpeakingIndicator(document.querySelector('.seat-'+i),speakers.includes(i),'.seat-meta',volume);setSpeakingIndicator(document.querySelector('#self-avatar-chip'),speakers.includes(0),null,volume);}
+CharacterRoom.prototype.update=function(...args){const result=update.apply(this,args);draw();return result;};
+addEventListener('message',event=>{if(event.source!==parent)return;if(event.data?.type==='preview-speakers')speakers=event.data.seats;else if(event.data?.type==='preview-volume')volume=event.data.level;else if(event.data?.type==='preview-input'){volume=event.data.level;speakers=event.data.seats;}else return;draw();});
+<\/script>`;
+const frame=document.querySelector('#game');
+frame.srcdoc=html.replace('<head>',`<head><base href="${base}">${demo}`);
+const picker=document.querySelector('#speakers'),micButton=document.querySelector('#mic-test');
+let micState='off',currentLevel=0,lastSpeech=0;
+function inputLevel(level){
+ currentLevel=level;
+ if(level>0)lastSpeech=performance.now();
+ const speaking=level>0||performance.now()-lastSpeech<180;
+ document.querySelector('#mic-level').value=level;
+ document.querySelector('#mic-percent').textContent=Math.round(level*100)+'%';
+ const seats=speaking&&picker.value?picker.value.split(',').map(Number):[];
+ frame.contentWindow.postMessage({type:'preview-input',level,seats},'*');
+}
+const mic=createMicrophoneMeter({onLevel:inputLevel,onState(state,error){
+ micState=state;
+ const active=state==='on'||state==='requesting';
+ if(!active){lastSpeech=0;frame.contentWindow.postMessage({type:'preview-input',level:0,seats:[]},'*');}
+ micButton.textContent=active?'Stop microphone':'Test my microphone';
+ document.querySelector('#volume-control').hidden=active;
+ document.querySelector('#mic-meter').hidden=!active;
+ document.querySelector('#source-label').textContent=active?'Real microphone · local only':'Microphone off';
+ document.querySelector('#mic-status').textContent=state==='requesting'?'Allow microphone access to begin.'
+  :state==='on'?'Speak softly, then louder. Nothing is recorded or sent.'
+  :state==='ended'?'Microphone disconnected.'
+  :state==='error'?(error?.name==='NotAllowedError'?'Microphone access was blocked. Allow it in your browser and retry.':error?.name==='NotFoundError'?'No microphone was found. Connect one and retry.':'Microphone could not start. Check your input device and retry.')
+  :'Microphone stopped.';
+}});
+micButton.addEventListener('click',()=>{if(micState==='on'||micState==='requesting'){lastSpeech=0;mic.stop();}else void mic.start();});
+addEventListener('pagehide',()=>mic.stop());
+document.addEventListener('visibilitychange',()=>{if(document.hidden){lastSpeech=0;mic.stop();}});
+document.querySelector('#speakers').addEventListener('change',event=>{if(micState==='on'){inputLevel(currentLevel);return;}frame.contentWindow.postMessage({type:'preview-speakers',seats:event.target.value?event.target.value.split(',').map(Number):[]},'*');});
+document.querySelector('#volume').addEventListener('input',event=>{document.querySelector('#source-label').textContent='Simulated voice activity';frame.contentWindow.postMessage({type:'preview-speakers',seats:picker.value?picker.value.split(',').map(Number):[]},'*');document.querySelector('#volume-value').textContent=event.target.value+'%';frame.contentWindow.postMessage({type:'preview-volume',level:Number(event.target.value)/100},'*');});
+</script>
+</body></html>
