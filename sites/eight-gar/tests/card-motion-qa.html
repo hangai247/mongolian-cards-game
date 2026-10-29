@@ -37,6 +37,15 @@ async function checks(){
  }
  for(const type of ['refill','sleep']){run=start(type,3,1);await seek(run,.5);if(type==='refill')assert(document.querySelectorAll('.anonymous-flight').length===3,'opponent refill reveals no card faces');await finish(run);}
  for(const phase of [.1,.3,.7]){run=start('pickup',12);await seek(run,phase);run.controller.abort();await run.pending;assert(!$('card-motion').children.length&&!document.querySelector('[style*="visibility: hidden"]')&&run.renders===1,`cancellation at ${phase*100}% removes flights and reveals destinations`);}
+ const originalAnimate=Element.prototype.animate;let startedAnimation,animationCalls=0;
+ try{
+  Element.prototype.animate=function(...args){if(++animationCalls===2)throw Error('Injected elevation failure');const animation=originalAnimate.apply(this,args);startedAnimation??=animation;return animation;};
+  run=start('play');let rejected=false;try{await run.pending;}catch{rejected=true;}
+  assert(rejected&&startedAnimation?.playState==='idle'&&!$('card-motion').children.length&&!document.querySelector('[style*="visibility: hidden"]'),'partial animation setup failure cancels started movement and reveals targets '+JSON.stringify({rejected,animationCalls,state:startedAnimation?.playState,shells:$('card-motion').children.length,hidden:!!document.querySelector('[style*="visibility: hidden"]')}));
+ }finally{Element.prototype.animate=originalAnimate;}
+ const motionLayer=$('card-motion');motionLayer.remove();
+ try{run=start('play');await run.pending;assert(!document.querySelector('[style*="visibility: hidden"]')&&run.renders===2,'missing motion surface settles the committed view without hiding targets');}
+ finally{document.body.append(motionLayer);}
  $('status').textContent='All motion checks passed';
  }catch(error){$('status').textContent='Failed';$('output').textContent+='✗ '+error.stack;}
 }

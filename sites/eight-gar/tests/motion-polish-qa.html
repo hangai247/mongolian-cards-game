@@ -1,0 +1,190 @@
+<!doctype html><meta charset="utf-8"><title>Spring and deal animation checks</title>
+<style>body{font:14px system-ui;margin:16px;background:#eef1ed}button{padding:10px}pre{white-space:pre-wrap;max-height:340px;overflow:auto}iframe{border:0;display:block}</style>
+<button id="run">Run animation polish checks</button> <strong id="status">Ready</strong><pre id="output"></pre>
+<iframe id="game" width="1440" height="900" title="Animation polish preview"></iframe>
+<script type="module">
+import {createDeck,createMatch} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'),out=document.querySelector('#output'),status=document.querySelector('#status');
+const assert=(ok,message)=>{if(!ok)throw Error(message);out.textContent+='✓ '+message+'\n';};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(check,label){for(let i=0;i<240;i++){if(check())return;await sleep(20);}throw Error('Timeout: '+label);}
+const save=state=>localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,signals:[]}));
+async function load({fresh=false,reduced=false,fine=true,width=1440,height=900,state=null}={}){
+ if(fresh)localStorage.removeItem('naiman-gar-practice-v1');else save(state??createMatch(createDeck(),0));
+ frame.width=width;frame.height=height;
+ const html=await (await fetch('../dist/practice.html')).text();
+ const shim=`window.__flightCalls=0;const originalAnimate=Element.prototype.animate;Element.prototype.animate=function(...args){if(this.closest('.flying-card'))window.__flightCalls++;return originalAnimate.apply(this,args);};window.__errors=[];addEventListener('error',e=>__errors.push(e.message));addEventListener('unhandledrejection',e=>__errors.push(String(e.reason)));const actualMedia=matchMedia.bind(window);const reduced=new EventTarget();reduced.matches=${reduced};reduced.media='(prefers-reduced-motion: reduce)';const finePointer=new EventTarget();finePointer.matches=${fine};window.__setReduced=value=>{reduced.matches=value;reduced.dispatchEvent(new Event('change'));};window.matchMedia=q=>q.includes('prefers-reduced-motion')?reduced:q==='(hover: hover) and (pointer: fine)'?finePointer:actualMedia(q);`;
+ await new Promise(resolve=>{frame.onload=resolve;frame.srcdoc=html.replace('<head>',`<head><base href="${new URL('../dist/',location.href)}"><script>${shim}<\/script>`);});
+ const doc=frame.contentDocument;
+ await until(()=>doc.querySelector('.room-photo')&&(fresh?!doc.querySelector('#start').disabled:doc.querySelector('#hand').dataset.count!==undefined),'game ready');
+ return doc;
+}
+const flights=doc=>[...doc.querySelectorAll('.flying-card')];
+const flightAnimations=doc=>flights(doc).flatMap(n=>n.getAnimations({subtree:true}));
+async function settled(doc){await until(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false','input unlocked');assert(!flights(doc).length&&!doc.querySelector('#hand [style*="visibility: hidden"]'),'flights removed and hand revealed');assert(!doc.defaultView.__errors.length,'no uncaught browser errors');}
+function curveCheck(animation,label){
+ const frames=animation.effect.getKeyframes(),matrix=f=>new DOMMatrixReadOnly(f.transform);
+ assert(frames.length===49,label+': sampled cubic spatial path');
+ const a=matrix(frames[0]),b=matrix(frames.at(-1)),mid=matrix(frames[24]);
+ assert(mid.m42<(a.m42+b.m42)/2-10,label+': path curves above the straight chord');
+}
+async function newDeal(doc){doc.querySelector('#start').click();await until(()=>flights(doc).length===40,'40-card deal');}
+async function checkDeal(width,height){
+ const doc=await load({fresh:true,width,height});await newDeal(doc);
+ const saved=localStorage.getItem('naiman-gar-practice-v1');
+ assert(doc.querySelector('#felt').getAttribute('aria-busy')==='true','deal locks the table');
+ assert(['play','pickup','sort','confirm-opener','computer-opener'].every(id=>doc.getElementById(id).disabled),'game and opener controls are disabled during deal');
+ doc.querySelector('#start').click();doc.querySelector('#computer-opener').click();doc.querySelector('#confirm-opener').click();
+ assert(localStorage.getItem('naiman-gar-practice-v1')===saved,'rapid input cannot redeal or choose an opener');
+ assert(doc.querySelectorAll('.anonymous-flight').length===35,'all 35 opponent deal cards remain anonymous');
+ const nodes=flights(doc),animations=flightAnimations(doc);animations.forEach(a=>a.pause());
+ await Promise.all(animations.map(a=>a.ready));
+ curveCheck(nodes[0].getAnimations()[0],`${width}×${height} deal`);
+ const timings=nodes.map(n=>n.getAnimations()[0].effect.getTiming());
+ assert(timings.every((t,i)=>t.delay===i*28),'deal is staggered in five passes around eight seats');
+ // Seek all card effects to their final pose without releasing the input lock.
+ animations.forEach(a=>{const t=a.effect.getTiming();a.currentTime=t.delay+t.duration;});
+ await new Promise(r=>doc.defaultView.requestAnimationFrame(()=>doc.defaultView.requestAnimationFrame(r)));
+ const own=[...doc.querySelectorAll('#hand [data-card-id]')];
+ assert(own.every(target=>{
+  const node=nodes.find(n=>n.querySelector('[data-public-id]')?.dataset.publicId===target.dataset.cardId);
+  const a=node.getBoundingClientRect(),b=target.getBoundingClientRect();
+  return Math.abs(a.x-b.x)<1.5&&Math.abs(a.y-b.y)<1.5&&Math.abs(a.width-b.width)<1.5&&Math.abs(a.height-b.height)<1.5;
+ }),`${width}×${height}: dealt cards land within 1.5px of the own-hand fan`);
+ animations.forEach(a=>a.finish());await settled(doc);
+ assert(doc.querySelectorAll('#hand [data-card-id]').length===5&&doc.querySelectorAll('.hand-back').length===35,'deal ends on five cards per seat');
+ assert([...doc.querySelectorAll('[data-opener-seat]')].some(n=>!n.disabled)||!doc.querySelector('#computer-opener').disabled,'opener control unlocks after deal');
+}
+async function checkHover(){
+ const doc=await load();doc.querySelector('#pause').click();
+ const win=doc.defaultView,card=doc.querySelector('#hand [data-card-id]'),next=card.nextElementSibling;
+ const move=n=>{const b=n.getBoundingClientRect();n.dispatchEvent(new win.PointerEvent('pointermove',{bubbles:true,pointerType:'mouse',clientX:b.left+b.width*.95,clientY:b.top+b.height*.1}));};
+ const angle=n=>parseFloat(n.style.rotate.split(' ').at(-1))||0;
+ const lift=n=>-(parseFloat(n.style.translate.split(' ').at(-1))||0);
+ assert(!flights(doc).length,'restoring a saved game does not replay the deal');
+ move(card);await sleep(35);const first=angle(card),firstLift=lift(card);await sleep(180);const later=angle(card);
+ assert(first>0&&first<later&&later<13,'hover tilt approaches its target with a bounded spring');
+ assert(firstLift>0&&firstLift<lift(card)&&lift(card)<13,'hover lift approaches its target with the same bounded spring');
+ const raised=lift(card);
+ move(next);assert(angle(card)>0,'moving to another card does not snap the previous card flat');
+ assert(lift(card)===raised,'switching cards preserves lift position and velocity');
+ await sleep(60);assert(lift(card)>0&&lift(card)<raised&&lift(next)>0,'old card springs down while the next card springs up');
+ const returning=lift(card);move(card);assert(lift(card)===returning,'rapid re-entry continues the existing spring without a jump');move(next);
+ await sleep(750);assert(!card.style.rotate&&!card.style.translate&&angle(next)>0,'previous card springs home while next card tilts');
+ doc.querySelector('#pause').click();await sleep(30);assert(next.disabled&&angle(next)>0,'selection lock preserves hover tilt');
+ const hand=doc.querySelector('#hand');hand.setAttribute('aria-busy','true');await sleep(30);
+ assert(!next.style.rotate&&!next.style.translate&&!next.classList.contains('hover-raised'),'presentation lock resets hover tilt and lift');
+ move(card);await sleep(60);assert(!card.style.rotate,'presentation lock prevents hover tilt');
+ hand.setAttribute('aria-busy','false');
+ doc.querySelector('#pause').click();move(card);await sleep(80);win.__setReduced(true);await sleep(30);
+ assert(!card.style.rotate&&!card.style.translate&&!doc.querySelector('.spring-tilting, .hover-raised'),'live reduced-motion preference stops spring work and lift');
+ move(card);await sleep(60);assert(!card.style.rotate,'reduced motion prevents hover springs');
+ win.__setReduced(false);move(card);await sleep(60);assert(angle(card)>0,'hover resumes after reduced motion is disabled');
+ card.dispatchEvent(new win.PointerEvent('pointerout',{bubbles:true,relatedTarget:doc.body}));await sleep(800);
+ assert(!card.style.rotate&&!card.style.translate&&!doc.querySelector('.spring-tilting, .hover-raised'),'pointer leave settles and releases lift and animation hints');
+ doc.querySelector('#pause').click();assert(!win.__errors.length,'hover has no uncaught errors');
+}
+async function checkSelection(){
+ const doc=await load(),win=doc.defaultView;doc.querySelector('#pause').click();
+ const card=doc.querySelector('#hand [data-card-id]'),b=card.getBoundingClientRect();
+ const lift=()=>-(parseFloat(win.getComputedStyle(card).translate.split(' ').at(-1))||0);
+ const progress=()=>Number(win.getComputedStyle(card).getPropertyValue('--selection-progress'));
+ card.dispatchEvent(new win.PointerEvent('pointermove',{bubbles:true,pointerType:'mouse',clientX:b.left+b.width*.9,clientY:b.top+b.height*.1}));
+ await sleep(60);const before=lift(),roll=win.getComputedStyle(card).transform;
+ card.click();assert(card.getAttribute('aria-pressed')==='true'&&lift()===before&&win.getComputedStyle(card).transform===roll,'selecting mid-hover preserves the current lift and fan angle');
+ await sleep(60);assert(progress()>0&&progress()<1,'selection straightens the fan through the spring');
+ card.dispatchEvent(new win.PointerEvent('pointerout',{bubbles:true,relatedTarget:doc.body}));await sleep(800);
+ assert(lift()===12&&progress()===1&&!card.classList.contains('spring-tilting'),'selected card stays raised after hover ends and releases its animation hints');
+ card.click();assert(lift()===12&&progress()===1,'deselection starts at the selected pose without snapping');
+ await sleep(60);assert(lift()>0&&lift()<12&&progress()>0&&progress()<1,'deselection springs back into the fan');
+ const returning=lift();card.click();assert(lift()===returning,'rapid reselection preserves spring position');card.click();
+ await sleep(800);assert(lift()===0&&progress()===0&&!card.style.translate&&!card.classList.contains('spring-tilting'),'deselection settles completely and cleans up');
+ card.click();await sleep(40);win.__setReduced(true);
+ assert(lift()===12&&progress()===1&&!card.style.translate&&!card.classList.contains('spring-tilting'),'reduced motion settles selection immediately');
+ card.click();assert(lift()===0&&progress()===0,'reduced-motion deselection is immediate');
+ doc.querySelector('#pause').click();
+ const touchDoc=await load({fine:false});touchDoc.querySelector('#pause').click();
+ const touchCard=touchDoc.querySelector('#hand [data-card-id]');touchCard.click();await sleep(60);
+ assert(parseFloat(touchCard.style.translate.split(' ').at(-1))<0&&Number(touchCard.style.getPropertyValue('--selection-progress'))<1,'selection springs also work without a hover-capable pointer');
+ touchDoc.querySelector('#pause').click();
+}
+async function checkOffTurnHover(){
+ const doc=await load({state:createMatch(createDeck(),1)}),win=doc.defaultView;
+ doc.querySelector('#pause').click();
+ const card=doc.querySelector('#hand [data-card-id]'),before=localStorage.getItem('naiman-gar-practice-v1'),b=card.getBoundingClientRect();
+ card.dispatchEvent(new win.PointerEvent('pointermove',{bubbles:true,pointerType:'mouse',clientX:b.left+b.width*.9,clientY:b.top+b.height*.1}));
+ await sleep(450); // Let the underdamped spring finish its small overshoot.
+ assert(card.disabled&&!!card.style.rotate,'cards tilt during an opponent turn while remaining disabled');
+ assert(Math.abs(parseFloat(win.getComputedStyle(card).translate.split(' ').at(-1))+12)<.1,'off-turn hover lifts the card by 12px');
+ assert([...card.parentElement.children].filter(n=>n!==card).every(n=>(parseInt(win.getComputedStyle(n).zIndex)||0)<Number(win.getComputedStyle(card).zIndex)),'hovered card renders above every fan neighbor');
+ card.click();doc.querySelector('#play').click();
+ assert(card.getAttribute('aria-pressed')==='false'&&doc.querySelector('#play').disabled&&localStorage.getItem('naiman-gar-practice-v1')===before,'off-turn hover cannot select cards or play a move');
+ doc.querySelector('#pause').click();
+}
+async function checkDraw(reduced){
+ const doc=await load({reduced});doc.querySelector('#pause').click();doc.querySelector('#hand [data-card-id]').click();
+ const survivors=[...doc.querySelectorAll('#hand [data-card-id]')].slice(1);
+ const before=new Map(survivors.map(n=>[n,n.getBoundingClientRect()]));
+ doc.querySelector('#play').click();
+ if(!reduced){
+  assert(survivors.some(n=>n.classList.contains('spring-layout')),'playing a card starts a re-fan spring for the survivors');
+  assert(survivors.every(n=>Math.abs(n.getBoundingClientRect().left-before.get(n).left)<1&&Math.abs(n.getBoundingClientRect().top-before.get(n).top)<1),'play re-fan starts from the survivors’ visible positions');
+  await until(()=>doc.querySelector('#card-motion').dataset.motion==='refill','reserve draw');
+  assert(survivors.some(n=>n.classList.contains('spring-layout')),'drawing a card springs the existing cards into their new slots');
+  curveCheck(flights(doc)[0].getAnimations()[0],'refill');
+  assert(doc.querySelector('#play').disabled&&doc.querySelector('#sort').disabled,'draw keeps inputs locked');
+ }
+ await settled(doc);doc.querySelector('#pause').click();
+ assert(doc.querySelectorAll('#hand [data-card-id]').length===5,'draw ends on committed five-card hand');
+ if(reduced)assert(!doc.querySelector('.spring-tilting, .spring-layout')&&doc.defaultView.__flightCalls===0,'reduced-motion draw creates no flight, layout or hover animations');
+}
+async function checkRefan(){
+ const doc=await load(),win=doc.defaultView,hand=doc.querySelector('#hand');
+ const nodes=[...hand.children],initial=new Map(nodes.map(n=>[n,n.getBoundingClientRect()]));
+ const continuous=before=>nodes.every(n=>Math.abs(n.getBoundingClientRect().left-before.get(n).left)<1&&Math.abs(n.getBoundingClientRect().top-before.get(n).top)<1);
+ doc.querySelector('#sort').click();assert(hand.querySelector('.spring-layout')&&continuous(initial),'sorting preserves visible positions before springing to the new fan');
+ await sleep(60);assert(!continuous(initial),'sorted cards slide toward their new positions');
+ const midway=new Map(nodes.map(n=>[n,n.getBoundingClientRect()]));doc.querySelector('#sort').click();
+ assert(continuous(midway),'rapid re-sorting starts from the current spring pose');
+ await until(()=>!hand.querySelector('.spring-layout'),'re-fan settled');
+ assert(continuous(initial),'re-fan settles exactly into the original slots after sorting back');
+ const card=nodes[0],bounds=card.getBoundingClientRect();
+ card.dispatchEvent(new win.PointerEvent('pointermove',{bubbles:true,pointerType:'mouse',clientX:bounds.left+bounds.width*.9,clientY:bounds.top+bounds.height*.1}));await sleep(100);
+ const tilted=new Map(nodes.map(n=>[n,n.getBoundingClientRect()]));doc.querySelector('#sort').click();
+ assert(continuous(tilted),'re-fanning preserves a card’s in-progress 3D hover pose');
+ card.dispatchEvent(new win.PointerEvent('pointerout',{bubbles:true,relatedTarget:doc.body}));
+ await until(()=>!hand.querySelector('.spring-layout'),'tilted re-fan settled');
+ doc.querySelector('#sort').click();win.dispatchEvent(new Event('resize'));
+ assert(!hand.querySelector('.spring-layout')&&nodes.every(n=>!n.style.getPropertyValue('--hand-layout')),'resize cancels layout springs and removes every temporary offset');
+ doc.querySelector('#sort').click();win.__setReduced(true);
+ assert(!hand.querySelector('.spring-layout'),'reduced-motion change settles an active re-fan');
+ doc.querySelector('#sort').click();assert(!hand.querySelector('.spring-layout'),'reduced-motion sorting changes layout immediately');
+}
+async function checkWideRefan(width,height){
+ const state=createMatch(createDeck(),0);for(let seat=1;seat<=5;seat++)state.hands[0].push(state.hands[seat].pop());
+ const doc=await load({state,width,height}),hand=doc.querySelector('#hand');doc.querySelector('#pause').click();
+ const nodes=[...hand.children];nodes[0].click();const before=new Map(nodes.slice(1).map(n=>[n,n.getBoundingClientRect()]));doc.querySelector('#play').click();
+ assert(hand.children.length===9&&!hand.classList.contains('wide-hand'),'playing from ten cards returns to the fanned layout');
+ assert([...before].every(([n,b])=>{const a=n.getBoundingClientRect();return Math.abs(a.left-b.left)<1.5&&Math.abs(a.top-b.top)<1.5&&Math.abs(a.width-b.width)<1.5&&Math.abs(a.height-b.height)<1.5;}),`${width}×${height}: wide-hand transition preserves card position and size before springing`);
+ await settled(doc);doc.querySelector('#pause').click();await until(()=>!hand.querySelector('.spring-layout'),'wide hand settled');
+ assert(hand.children.length===9,'wide-hand re-fan preserves all remaining cards');
+}
+document.querySelector('#run').onclick=async()=>{
+ status.textContent='Running';out.textContent='';document.querySelector('#run').disabled=true;
+ try{
+  await checkDeal(1440,900);await checkDeal(390,844);await checkHover();await checkSelection();await checkOffTurnHover();await checkRefan();await checkDraw(false);await checkDraw(true);await checkWideRefan(1440,900);await checkWideRefan(390,844);
+  let doc=await load({fresh:true,reduced:true});doc.querySelector('#start').click();await settled(doc);
+  assert(doc.querySelectorAll('#hand [data-card-id]').length===5&&doc.defaultView.__flightCalls===0,'reduced-motion initial deal settles immediately without creating animations');
+  doc=await load({fresh:true});await newDeal(doc);doc.defaultView.__setReduced(true);await settled(doc);
+  assert(doc.querySelectorAll('.hand-back').length===35,'preference change mid-deal preserves every opponent card');
+  doc=await load({fresh:true});await newDeal(doc);doc.defaultView.dispatchEvent(new Event('resize'));await settled(doc);
+  assert(doc.querySelectorAll('#hand [data-card-id]').length===5,'resize mid-deal preserves committed cards');
+  const deck=createDeck(),hands=Array.from({length:8},()=>[]);for(let i=0;i<43;i++)hands[1+i%7].push(deck[i]);
+  const won={...createMatch(deck,0),hands,reserve:[],phase:'round-over',winner:0,scores:[1,0]};
+  doc=await load({state:won});doc.querySelector('#continue').click();await until(()=>flights(doc).length===40,'next round deal');
+  assert(JSON.parse(localStorage.getItem('naiman-gar-practice-v1')).state.round===2,'next round uses the same deal presentation');
+  await settled(doc);
+  status.textContent='All animation polish checks passed';
+ }catch(error){status.textContent='Failed';out.textContent+='✗ '+error.stack;}finally{document.querySelector('#run').disabled=false;}
+};
+</script>

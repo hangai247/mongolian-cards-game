@@ -64,6 +64,9 @@ body.practice-table .welcome:has(#practice-avatar-picker) { overflow: auto; top:
   .ger-table.has-match .brand { font-size: 21px; gap: 5px; }
   .ger-table.has-match .brand-mark { width: 28px; height: 28px; }
   .has-match #self-avatar-chip { left: 103px; }
+  /* Reserve space for a six-character room code on the narrowest phones. */
+  .ger-table:not(.practice-table).has-match #self-avatar-chip { padding: 2px; }
+  .ger-table:not(.practice-table).has-match #self-avatar-chip > span:last-child { display: none; }
 }
 /* Keep name, code and joining actions together above a phone keyboard. */
 .lobby-keyboard #entry-avatar-picker { margin-top: 10px; }

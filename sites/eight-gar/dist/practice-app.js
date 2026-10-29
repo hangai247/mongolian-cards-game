@@ -1,3 +1,4 @@
+import { makePlayingCard } from './card-system.js';
 import { createSleepNotice, renderSleepFeedback } from './table-feedback.js';
 import { controlIcon, setActionButton, computerBadge } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
@@ -9,8 +10,9 @@ import { mountTeamSignals } from './team-signals.js';
 import { RANKS, SUITS, JOKERS, createDeck, shuffleDeck, prepareMatch, applyAction, prepareNextRound, chooseLeader } from './rules/engine.js';
 import { findPlay, chooseComputerLeader } from './rules/strategy.js';
 import { readSavedMatch } from './practice-save.js';
-import { transitionSteps, fanLayout } from './presentation.js';
-import { animateStep } from './motion.js';
+import { transitionSteps, fanLayout, dealStep } from './presentation.js';
+import { animateStep, waitForDealLayout } from './motion.js';
+import { reconcileHand } from './hand-view.js';
 import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
@@ -20,7 +22,7 @@ const openerSelection = mountOpenerSelection({ container: $('opening-players'), 
 // The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
 function renderConfirmOpener() {
   const chosen = openerSelection.value;
-  $('confirm-opener').disabled = chosen === null;
+  $('confirm-opener').disabled = chosen === null || animating;
   $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${NAMES[chosen]} эхэлнэ · батлах →`;
 }
 const NAMES = ['Та', 'Тэмүү', 'Батаа', 'Сарнай', 'Ану', 'Болд', 'Нараа', 'Оюу'];
@@ -60,7 +62,7 @@ function renderSignals() {
 let storageAvailable = true, animating = false, motionController = null, motionEpoch = 0;
 let latestCharacterState = null;
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=speaking2').then(({CharacterRoom}) => {
+const characterReady = import('./photographic-room.js?v=speaking2').then(({CharacterRoom}) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
 }).catch(() => { $('character-room').dataset.renderer = 'fallback'; });
@@ -69,12 +71,7 @@ const deck = () => shuffleDeck(createDeck(), random);
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').classList.add('show'); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3500); }
 function shortCard(card) { return card.kind === 'joker' ? `${JOKER_LABELS[card.color]} жокер` : `${card.rank}${SYMBOLS[card.suit]}`; }
 function cardElement(card, interactive = false) {
-  const element = document.createElement(interactive ? 'button' : 'div');
-  const red = card.kind === 'joker' ? card.color === 'red' : ['hearts', 'diamonds'].includes(card.suit);
-  element.className = `card${red ? ' red' : ''}${card.kind === 'joker' ? ` joker ${card.color}` : ''}`;
-  element.setAttribute('aria-label', cardLabel(card));
-  if (card.kind === 'ordinary') element.dataset.rank = card.rank;
-  if (!interactive) element.dataset.publicId = card.id;
+  const element = makePlayingCard(card, interactive);
   if (interactive) {
     element.type = 'button'; element.dataset.cardId = card.id;
     element.classList.toggle('selected', selected.has(card.id));
@@ -86,12 +83,6 @@ function cardElement(card, interactive = false) {
       document.querySelector(`[data-card-id="${CSS.escape(card.id)}"]`)?.focus({ preventScroll: true });
     });
   }
-  const rank = card.kind === 'joker' ? 'ЖОКЕР' : card.rank;
-  const symbol = card.kind === 'joker' ? '✧' : SYMBOLS[card.suit];
-  const face = card.kind === 'ordinary' && ['J', 'Q', 'K'].includes(card.rank);
-  const pipCount = card.kind === 'joker' ? 0 : Number(card.rank);
-  const center = face ? `<span class="face-emblem">${card.rank === 'Q' ? '♛' : card.rank === 'K' ? '♚' : '♞'}</span><span class="face-suit">${symbol}</span>` : pipCount >= 2 && pipCount <= 10 ? `<span class="pips pips-${pipCount}">${Array.from({length:pipCount}, () => `<i>${symbol}</i>`).join('')}</span>` : `<span class="card-center">${symbol}</span>`;
-  element.innerHTML = `<span class="card-corner">${rank}<small>${card.kind === 'joker' ? '' : symbol}</small></span>${center}<span class="card-corner card-bottom">${rank}<small>${card.kind === 'joker' ? '' : symbol}</small></span>${card.kind === 'joker' ? `<span class="joker-label">${JOKER_LABELS[card.color]}</span>` : ''}`;
   return element;
 }
 function save() {
@@ -118,20 +109,13 @@ function sortedHand(scene = state) {
   return [...scene.hands[0]].sort((a, b) => byRank ? rankIndex(a) - rankIndex(b) || suitIndex(a) - suitIndex(b) : suitIndex(a) - suitIndex(b) || rankIndex(a) - rankIndex(b));
 }
 function renderHand(scene = state) {
-  const hand = $('hand'), scrollLeft = hand.scrollLeft; hand.replaceChildren();
-  if (!scene) { for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } return; }
+  const hand = $('hand');
+  if (!scene) { hand.replaceChildren(); for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } return; }
   const cards = sortedHand(scene);
-  hand.classList.toggle('wide-hand', cards.length > 9);
-  hand.style.setProperty('--hand-size', cards.length);
-  hand.dataset.count = cards.length;
-  cards.forEach((card, index) => {
-    const element = cardElement(card, true);
-    const position = index - (cards.length - 1) / 2;
-    element.style.setProperty('--fan', `${cards.length > 9 ? 0 : position * 4}deg`);
-    element.style.setProperty('--lift', `calc(var(--hand-card-height,250px) * ${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * .008})`);
-    hand.append(element);
+  reconcileHand(hand, cards, {
+    create: card => cardElement(card, true), selected,
+    disabled: scene.turn !== 0 || scene.phase !== 'playing' || paused || animating,
   });
-  hand.scrollLeft = scrollLeft;
   $('hand-count').textContent = `${scene.hands[0].length} хөзөр`;
   const sortLabel = byRank ? 'Тамгаар эрэмбэлэх' : 'Чансаагаар эрэмбэлэх';
   setActionButton($('sort'), sortLabel, 'sort');
@@ -143,11 +127,14 @@ function playError() {
   catch (error) { return error.code; }
 }
 function renderActions() {
+  $('start').disabled = animating;
+  $('continue').disabled = animating;
   const active = state?.phase === 'playing' && state.turn === 0 && !paused && !animating;
   const canResume = state?.phase === 'playing' && paused && !animating;
   document.body.classList.toggle('is-paused', !!canResume);
   for (const id of ['new-match', 'rules-open', 'sort']) $(id).disabled = animating;
   $('felt').setAttribute('aria-busy', String(animating));
+  $('hand').setAttribute('aria-busy', String(animating));
   const error = active ? playError() : null;
   $('play').disabled = !canResume && (!active || selected.size === 0 || !!error);
   $('pickup').disabled = !active || state.table.pile.length === 0;
@@ -229,7 +216,7 @@ function render(scene = state, motion = null) {
   else if (scene && scene.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'Шинээр эхэлнэ.'; $('highest').append(empty); }
   layoutTablePile($('highest'));
   $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase === 'match-over' ? 'ТОГЛОЛТ ДУУСЛАА' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'Түр зогссон' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
-  if (motion) $('turn-label').textContent = ({pickup:'ХӨЗӨР АВЧ БАЙНА',play:'ХӨЗӨР ТАВЬЖ БАЙНА',refill:'НӨӨЦӨӨС НӨХӨЖ БАЙНА',sleep:'УНТАНА'})[motion.type];
+  if (motion) $('turn-label').textContent = ({pickup:'ХӨЗӨР АВЧ БАЙНА',play:'ХӨЗӨР ТАВЬЖ БАЙНА',refill:'НӨӨЦӨӨС НӨХӨЖ БАЙНА',sleep:'УНТАНА',deal:'ХӨЗӨР ТАРААЖ БАЙНА'})[motion.type];
   renderSleepFeedback(scene, motion, sleepNotice);
   $('reserve-count').textContent = scene?.reserve.length ?? 3;
   $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
@@ -274,15 +261,16 @@ async function commit(move) {
     } else if (event?.type === 'picked-up') liveMove = `${NAMES[actor]} ширээнээс ${event.cards.length} хөзөр авлаа.`;
     if (events.some(event => event.type === 'table-slept')) liveMove = `Унтана — хөзөр тоглоомоос гарлаа.${state.phase === 'playing' ? ` ${actor === 0 ? 'Та' : `${NAMES[actor]}`} дахин эхэлнэ.` : ' Үе дууслаа.'} ${liveMove}`;
     // Persist one atomic engine result. Animation never changes the committed card inventory.
-    save(); animating = true; motionController = new AbortController();
+    save(); animating = true;
+    const controller = new AbortController(); motionController = controller;
     renderActions();
     for (const step of transitionSteps(previous, events)) {
-      if (motionController.signal.aborted || token !== motionEpoch) break;
+      if (token !== motionEpoch || controller.signal.aborted) break;
       atmosphere.cue(step.type, `${token}:${step.type}`);
       if (step.type === 'pickup' && step.cards.length >= 8) characterRoom.react?.({ type: 'surprise', player: actor });
-      await animateStep(step, { render, cardElement, signal: motionController.signal, motionEnabled: motionEnabled() });
+      await animateStep(step, { render, cardElement, signal: controller.signal, motionEnabled: motionEnabled() });
     }
-    completedPresentation = !motionController.signal.aborted;
+    completedPresentation = !controller.signal.aborted && token === motionEpoch;
   } catch (error) {
     toast(ERRORS[error.code] || 'Дараагийн нүүдлээ дахин хийнэ үү.');
     console.error(error);
@@ -311,10 +299,30 @@ function renderDiscussion(scene = state) {
     : 'Хөзөр тараагдсан. Эсрэг баг эхлэх тоглогчоо сонгоно.';
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
-  openerSelection.render({ key: scene.round, entries: [0, 2, 4, 6].map(seat => ({ seat, name: NAMES[seat], count: scene.hands[seat].length })), busy: !ours });
+  $('computer-opener').disabled = animating;
+  openerSelection.render({ key: scene.round, entries: [0, 2, 4, 6].map(seat => ({ seat, name: NAMES[seat], count: scene.hands[seat].length })), busy: !ours || animating });
   renderConfirmOpener();
 }
+async function presentDeal() {
+  const token = ++motionEpoch, controller = new AbortController();
+  motionController?.abort(); motionController = controller; animating = true;
+  const step = dealStep(state);
+  try {
+    if (motionEnabled() && !document.hidden) {
+      render(step.before, { type: 'deal', player: -1 });
+      if (!await waitForDealLayout(characterReady, controller.signal)) return;
+    }
+    if (token === motionEpoch && !controller.signal.aborted) {
+      await animateStep(step, { render, cardElement, signal: controller.signal, motionEnabled: motionEnabled() });
+    }
+  } catch (error) { console.error(error); }
+  finally {
+    if (token === motionEpoch) { animating = false; motionController = null; render(); }
+  }
+}
 function startMatch() {
+  if (animating) return;
+  if ($('round-dialog').open) $('round-dialog').close();
   sleepNotice.clear();
   openerSelection.reset();
   stopEffects();
@@ -323,10 +331,10 @@ function startMatch() {
   state = prepareMatch(deck(), random() < .5 ? 0 : 1);
   signals = advanceSignals(null, state, [], [1, 2, 3, 4, 5, 6, 7]);
 
-  save(); render();
+  save(); void presentDeal();
 }
 function confirmOpeningPlayer(leader) {
-  if (state?.phase !== 'choosing-leader') return;
+  if (state?.phase !== 'choosing-leader' || animating) return;
   try {
     state = chooseLeader(state, leader, state.revision); selected.clear(); paused = false; liveMove = '';
 
@@ -348,8 +356,10 @@ function showRound() {
   $('result-detail').textContent = `${NAMES[state.turn]} бүх хөзрөө дуусгалаа. ${state.scores[0]}–${state.scores[1]}${matchOver ? ' — түрүүлж таван үе хожсон баг ялна.' : ` · Дараагийн хөзөр: ${SYMBOLS[SUITS[state.round % 4]]} ${LABELS[SUITS[state.round % 4]]}.`}`;
   $('continue').textContent = matchOver ? 'Дахин нэг тоглолт →' : 'Дараагийн үеийн хөзөр тараах →';
   if (!$('round-dialog').open) $('round-dialog').show();
+  characterRoom.resize?.();
 }
 $('continue').addEventListener('click', () => {
+  if (animating || !state || !['round-over', 'match-over'].includes(state.phase)) return;
   stopEffects();
   $('round-dialog').close();
   if (state.phase === 'match-over') startMatch();
@@ -359,7 +369,7 @@ $('continue').addEventListener('click', () => {
     sleepNotice.clear();
     paused = false; selected.clear(); liveMove = '';
 
-    save(); render();
+    save(); void presentDeal();
   }
 });
 $('round-dialog').addEventListener('cancel', event => event.preventDefault());
@@ -369,6 +379,7 @@ for (const button of document.querySelectorAll('[data-close]')) button.addEventL
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => scheduleBot());
 $('pile-open').addEventListener('click', () => { $('pile-cards').replaceChildren(...state.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
 function startWithPicker(picker) {
+  if (animating) return false;
   practiceAvatar = picker.value; rememberAvatar(practiceAvatar); startMatch(); return true;
 }
 $('start').addEventListener('click', () => startWithPicker(practicePicker));
@@ -392,6 +403,7 @@ $('pickup').addEventListener('click', () => { if (state?.turn === 0 && !paused) 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopEffects(); clearBot(); motionController?.abort(); } else scheduleBot();
 });
+window.addEventListener('pagehide', () => { stopEffects(); clearBot(); motionController?.abort(); });
 window.addEventListener('resize', () => { if (animating) { stopEffects(); motionController?.abort(); } });
 reducedMotion.addEventListener('change', changePresentation);
 document.addEventListener('pointerdown', () => { void atmosphere.unlock(); }, { capture: true });

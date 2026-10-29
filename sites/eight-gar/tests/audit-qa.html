@@ -1,0 +1,51 @@
+<!doctype html><meta charset="utf-8"><title>Card presentation regression checks</title>
+<style>body{font:14px system-ui;margin:20px;background:#eee}iframe{border:0;display:block}pre{white-space:pre-wrap}button{padding:10px}</style>
+<button id="run">Run presentation regressions</button> <strong id="status">Ready</strong><pre id="output"></pre>
+<iframe id="game" width="390" height="844" title="Card regression preview"></iframe>
+<script type="module">
+import {createDeck,createMatch} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'),output=document.querySelector('#output'),status=document.querySelector('#status');
+const assert=(ok,message)=>{if(!ok)throw Error(message);output.textContent+='✓ '+message+'\n';};
+async function until(check){for(let i=0;i<200;i++){if(check())return;await new Promise(r=>setTimeout(r,25));}throw Error('Timed out');}
+async function load(count,width,height){
+ const deck=createDeck(), pool=[...deck], hands=[pool.splice(0,count)], reserve=pool.splice(0,3);
+ for(let i=1;i<8;i++)hands.push(pool.splice(0,1)); hands[7].push(...pool);
+ const state={...createMatch(deck,0),hands,reserve};
+ localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,signals:[]}));
+ frame.width=width;frame.height=height;
+ await new Promise(resolve=>{frame.onload=resolve;frame.src='../dist/practice.html?audit='+Date.now();});
+ await until(()=>frame.contentDocument.querySelectorAll('#hand [data-card-id]').length===count&&frame.contentDocument.querySelector('.seat-1')?.style.left);
+ return frame.contentDocument;
+}
+document.querySelector('#run').onclick=async()=>{
+ status.textContent='Running';output.textContent='';document.querySelector('#run').disabled=true;
+ try{
+  for(const [count,width,height] of [[5,390,844],[20,390,844],[5,1440,900],[20,844,390]]){
+   const doc=await load(count,width,height);doc.querySelector('#pause').click();
+   const hand=doc.querySelector('#hand'),nodes=[...hand.children],card=nodes[0],label=`${count} cards at ${width}×${height}`;
+   card.click();
+   assert(nodes.every(n=>n.isConnected&&hand.contains(n)),label+': selection preserves card nodes');
+   assert(doc.activeElement===card&&card.getAttribute('aria-pressed')==='true',label+': focus and selection preserved');
+   card.click();card.click();assert(card.getAttribute('aria-pressed')==='true',label+': rapid toggle is deterministic');
+   hand.scrollLeft=hand.scrollWidth;const scroll=hand.scrollLeft;
+   doc.querySelector('#sort').click();
+   assert(nodes.every(n=>n.isConnected)&&doc.activeElement===card,label+': sort preserves nodes and focus');
+   assert(Math.abs(hand.scrollLeft-scroll)<2,label+': sort preserves scroll');
+   if(nodes.some((node,index)=>hand.children[index]!==node)){
+    await new Promise(r=>setTimeout(r,60));
+    assert(!!hand.querySelector('.spring-layout'),label+': sorting a scrolled hand keeps the re-fan spring active');
+   }
+   doc.querySelector('#play').click();doc.querySelector('#play').click();
+   assert(doc.querySelector('#felt').getAttribute('aria-busy')==='true',label+': play locks input');
+   frame.contentWindow.dispatchEvent(new Event('resize'));
+   await until(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false');
+   doc.querySelector('#pause').click();
+   const saved=JSON.parse(localStorage.getItem('naiman-gar-practice-v1')).state;
+   assert(saved.revision===1,label+': rapid double play commits once');
+   assert([...saved.hands.flat(),...saved.reserve,...saved.table.pile,...saved.sleeping].length===43,label+': resize preserves 43 committed cards');
+   assert(!doc.querySelector('.flying-card')&&!doc.querySelector('#hand [style*="visibility: hidden"]'),label+': cancellation removes flights and reveals cards');
+  }
+  status.textContent='All presentation regressions passed';
+ }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}finally{document.querySelector('#run').disabled=false;}
+};
+</script>

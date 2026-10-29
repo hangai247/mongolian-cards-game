@@ -22,6 +22,20 @@ export function transitionSteps(before, events) {
   }
   return steps;
 }
+/** Presentation-only deal, in five passes around the table. Opponents stay anonymous even in practice. */
+export function dealStep(scene) {
+  const cards = [], recipients = [];
+  const rounds = Math.max(0, ...scene.hands.map(hand => hand.length));
+  for (let index = 0; index < rounds; index++) for (let player = 0; player < scene.hands.length; player++) {
+    const card = scene.hands[player][index];
+    if (!card) continue;
+    cards.push(player === 0 ? card : { id: `back:deal:${player}:${index}`, kind: 'back' });
+    recipients.push({ player, index });
+  }
+  return { type: 'deal', player: -1, cards, recipients,
+    before: { ...scene, hands: scene.hands.map(() => []) }, after: scene };
+}
+
 /** Only a count reaches the opponent card-fan renderer, never hidden card identities. */
 export function fanLayout(count) {
   if(!Number.isInteger(count)||count<0||count>43)throw new RangeError('Invalid hand size');

@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>Actual deck appearance checks</title>
+<style>body{font:14px system-ui;margin:12px}button{padding:12px}iframe{display:block;border:0;margin:12px 0}pre{white-space:pre-wrap;max-height:240px;overflow:auto}</style>
+<button id="run">Check actual cards</button><button id="desktop">Desktop table</button><button id="mobile">Phone table</button><strong id="status">Ready</strong><pre id="report"></pre><iframe id="game" title="Actual practice game" width="1440" height="900"></iframe>
+<script type="module">
+import {createDeck,createMatch} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'),report=document.querySelector('#report'),status=document.querySelector('#status');
+const deck=createDeck(),find=(suit,rank)=>deck.find(c=>c.suit===suit&&c.rank===rank);
+const own=[find('hearts','7'),find('hearts','Q'),find('spades','K'),find('diamonds','A'),deck.find(c=>c.color==='red')];
+const pile=[find('spades','7'),find('diamonds','7'),find('clubs','7')],used=new Set([...own,...pile].map(c=>c.id));
+const pool=deck.filter(c=>!used.has(c.id)),reserve=pool.splice(0,3),hands=[own,...Array.from({length:7},()=>pool.splice(0,4))];hands[7].push(...pool);
+const state={...createMatch(deck,0),hands,reserve,table:{pile,highest:pile}};
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const assert=(condition,text)=>{if(!condition)throw Error(text);report.textContent+='✓ '+text+'\n'};
+async function load(width,height){
+ localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state,signals:[]}));frame.width=width;frame.height=height;
+ await new Promise(resolve=>{frame.onload=resolve;frame.src='../dist/practice.html?card-style='+Date.now()});
+ for(let i=0;i<150;i++){if(frame.contentDocument.querySelectorAll('#hand .mongol-card').length===5&&frame.contentDocument.querySelector('.room-photo')?.naturalWidth)break;await wait(30)}
+ await wait(100);const doc=frame.contentDocument;if(doc.querySelector('#pause').textContent.includes('Үргэлжлүүлэх'))doc.querySelector('#pause').click();return doc;
+}
+async function run(){
+ status.textContent='Running';report.textContent='';
+ try{for(const [w,h] of [[1440,900],[390,844],[320,568],[844,390]]){
+  const doc=await load(w,h),win=frame.contentWindow,cards=[...doc.querySelectorAll('#hand .card')];
+  assert(cards.length===5,`${w}×${h}: real hand uses the shared renderer`);
+  assert(doc.querySelectorAll('#highest .mongol-card').length===3,`${w}×${h}: actual table cards use the same design`);
+  assert(doc.documentElement.scrollWidth<=w+1&&doc.documentElement.scrollHeight<=h+1,`${w}×${h}: table fits the viewport`);
+  for(const card of cards){
+   const b=card.getBoundingClientRect(),corners=[...card.querySelectorAll('.card-corner')];
+   assert(b.width>30&&b.height>45&&b.top>=0&&b.bottom<=h+2,`${card.getAttribute('aria-label')}: card remains visible`);
+   for(const c of corners){const cb=c.getBoundingClientRect();assert(cb.width>0&&cb.height>0,'rank and suit corners have space');}
+   const art=card.querySelector('.mongol-court-art');
+   if(art){assert(win.getComputedStyle(art).backgroundImage.includes('naiman-courts-v2.png'),'New court artwork is used');}
+  }
+  const selectable=cards.find(c=>!c.disabled);assert(selectable,'hand can be selected');selectable.click();await wait(50);
+  assert(selectable.getAttribute('aria-pressed')==='true','selection stays functional');
+  doc.querySelector('#sort').click();await wait(350);
+  assert([...doc.querySelectorAll("#hand [data-card-id]")].find(node=>node.dataset.cardId===selectable.dataset.cardId).getAttribute('aria-pressed')==='true','sorting preserves selection');
+ }
+ await load(1440,900);status.textContent='All card checks passed';
+ }catch(error){status.textContent='Failed';report.textContent+='✗ '+error.stack;}
+}
+document.querySelector('#run').onclick=run;
+document.querySelector('#desktop').onclick=()=>load(1440,900);
+document.querySelector('#mobile').onclick=()=>load(390,844);
+</script>

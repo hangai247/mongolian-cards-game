@@ -27,6 +27,8 @@ document.querySelector('#run').onclick=async()=>{
    const label=`${width}×${height} ${matchOver?'match':'round'} review`;
    assert(!panel.matches(':modal'),label+': results do not block the page');
    const resultBox=panel.getBoundingClientRect(),pileBox=pile.getBoundingClientRect();
+   const cards=[...pile.querySelectorAll('.card')];
+   assert(cards.every(card=>card.getBoundingClientRect().width>=32&&card.getBoundingClientRect().height>=46),label+': final cards remain readable');
    assert(resultBox.top>=pileBox.bottom||resultBox.left>=pileBox.right,label+': results do not cover the table');
    const button=doc.querySelector('#continue'),box=button.getBoundingClientRect();
    assert(box.top>=0&&box.bottom<=height+1&&box.left>=0&&box.right<=width+1,label+': continue button fits');
@@ -37,6 +39,14 @@ document.querySelector('#run').onclick=async()=>{
    assert(doc.querySelectorAll('#pile-cards .card').length===2,label+': final cards are available');
    doc.querySelector('#pile-dialog [data-close]').click();assert(panel.open,label+': results persist after inspection');
    button.click();assert(!panel.open&&!doc.querySelector('#discussion').hidden,label+': next deal works');
+  }
+  for(const matchOver of [false,true]){
+   const doc=await load(matchOver,390,844);
+   doc.querySelector('.header-right [aria-label="Тохиргоо"]').click();
+   doc.querySelector('#new-match').click();doc.querySelector('#new-confirm').click();
+   assert(!doc.querySelector('#round-dialog').open,'Settings restart closes old '+(matchOver?'match':'round')+' results');
+   await waitFor(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false');
+   assert(!doc.querySelector('dialog[open]'),'Settings restart leaves no dialog blocking bots');
   }
   await load(false,390,844);status.textContent='All review checks passed';
  }catch(error){status.textContent='Failed';output.textContent+='✗ '+error.stack;}

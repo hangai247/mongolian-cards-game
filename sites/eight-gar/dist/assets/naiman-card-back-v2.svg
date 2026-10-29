@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 308" fill="none">
+<defs>
+ <pattern id="steps" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M0 16h8V8h16v16h-8v8M32 16h-8M16 0v8" stroke="#98b9ad" stroke-opacity=".2" stroke-width="1.2"/></pattern>
+ <g id="petal"><path d="M100 100c30 0 54 24 54 54h-27c0-15-12-27-27-27Z" fill="#9fbeb2"/><path d="M100 108c25 0 46 21 46 46" stroke="#16343d" stroke-width="2"/></g>
+ <g id="crown"><path d="m71 47 14-14 15 14 15-14 14 14-29 29Z" fill="#9fbeb2"/><path d="m84 47 16 16 16-16" stroke="#16343d" stroke-width="2"/><path d="M40 91V40h17M160 91V40h-17" stroke="#9fbeb2" stroke-width="2"/><circle cx="100" cy="25" r="3" fill="#d7ab60"/></g>
+</defs>
+<rect width="200" height="308" rx="14" fill="#faf8f2"/>
+<rect x="9" y="9" width="182" height="290" rx="7" fill="#16343d"/>
+<rect x="17" y="17" width="166" height="274" rx="2" fill="url(#steps)" stroke="#9fbeb2" stroke-width="1"/>
+<use href="#crown"/><use href="#crown" transform="rotate(180 100 154)"/>
+<path d="m100 83 71 71-71 71-71-71Z" fill="#16343d" stroke="#9fbeb2" stroke-width="1"/>
+<use href="#petal"/><use href="#petal" transform="rotate(90 100 154)"/><use href="#petal" transform="rotate(180 100 154)"/><use href="#petal" transform="rotate(270 100 154)"/>
+<path d="m100 137 17 17-17 17-17-17Z" fill="#d7ab60"/><path d="m100 147 7 7-7 7-7-7Z" fill="#16343d"/>
+<path d="m25 148 6 6-6 6-6-6Zm150 0 6 6-6 6-6-6Z" fill="#d7ab60"/>
+</svg>

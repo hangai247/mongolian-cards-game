@@ -45,7 +45,9 @@ export class CharacterRoom {
     const pile=felt.querySelector('#highest');
     const count=pile.querySelectorAll('.table-play').length;
     const hud = felt.querySelector('.turn-hud');
-    const hudTop = hud ? hud.getBoundingClientRect().top - felt.getBoundingClientRect().top : height * .63;
+    const hudBounds = hud?.getBoundingClientRect();
+    // Results hide the turn HUD. Its zero rectangle must not collapse the pile.
+    const hudTop = hudBounds?.height ? hudBounds.top - felt.getBoundingClientRect().top : height * .63;
     if (count <= 1 && !(height < 500 && width > height)) {
       p.play.y = Math.max(p.seats[4].y + 48, Math.min(p.play.y, hudTop - p.play.height - 12));
       p.play.height = Math.max(52, Math.min(p.play.height, hudTop - p.play.y - 12));

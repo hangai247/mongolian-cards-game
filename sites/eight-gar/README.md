@@ -127,3 +127,7 @@ Online reconnect feedback uses one game message, dims unavailable cards, and con
 Reserved bot seats preserve their human's name. Microphone captions distinguish connection, permission, mute, and playback states; blocked playback is resumed from the existing audio control, without a banner over play controls. Voice-error notifications are limited to one per outage, and speaking seats have a visible outline.
 
 Validation: engine, client, and server tests; both TypeScript checks; `tests/mobile-feedback-qa.html` and `tests/round-review-qa.html` on a disposable local origin at 320×568, 390×844, 568×320, 844×390, 820×1180, and 1440×900. The online viewport runner also passes with microphone visibility simulated. Real microphone permissions, LiveKit audio, and device interruptions still need physical-device verification. Lower-priority report suggestions such as rematch celebrations and practice/online new-match parity are deferred. The older general `browser-qa.html` runner contains stale assertions about the removed viewer seat; the focused runners above exercise this change.
+
+### Cards matched to the Mongolian table
+
+`dist/card-system.js` and `dist/card-system.css` now render the actual 43-card deck consistently in hands, table piles, inspection and motion. The warm paper, clearer rank/suit corners, retained Mongolian court artwork and brand-knot backs match the existing ger scene. The collection showcase and generated concept images have been removed. See [the live-deck styling notes](../../docs/CARD_STYLE.md).

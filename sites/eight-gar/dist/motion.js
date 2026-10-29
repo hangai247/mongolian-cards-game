@@ -1,3 +1,20 @@
+import { bezierPoses } from './motion-math.js';
+import { resetHandTilt } from './hover-tilt.js';
+import { resetHandLayout } from './hand-layout.js';
+
+/** Never keep game input locked behind a stalled decorative-scene import. */
+export function waitForDealLayout(ready, signal, timeoutMs = 1000) {
+  if (signal.aborted) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let timer;
+    const finish = value => { clearTimeout(timer); signal.removeEventListener('abort', abort); resolve(value); };
+    const abort = () => finish(false);
+    timer = setTimeout(abort, timeoutMs);
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve(ready).then(() => finish(!signal.aborted), () => finish(false));
+  });
+}
+
 const rect = node => {
   const r=node?.getBoundingClientRect();
   return r&&r.width&&r.height?{x:r.left,y:r.top,width:r.width,height:r.height}:null;
@@ -24,10 +41,11 @@ const backs=player=>[...document.querySelectorAll(`.seat-${player} .hand-back`)]
 const fallback=()=>rect(document.querySelector('#highest'))||{x:innerWidth/2,y:innerHeight/2,width:50,height:75};
 function source(step,i){
   if(step.type==='pickup'||step.type==='sleep')return publicCard(step.cards[i].id);
-  if(step.type==='refill')return document.querySelector('.tiny-deck');
+  if(step.type==='refill'||step.type==='deal')return document.querySelector('.tiny-deck');
   return step.player===0?ownCard(step.cards[i].id):backs(step.player).at(-1-i);
 }
 function destination(step,i){
+  if(step.type==='deal'){const {player,index}=step.recipients[i];return player===0?ownCard(step.cards[i].id):backs(player)[index];}
   if(step.type==='play')return publicCard(step.cards[i].id);
   if(step.player===0)return ownCard(step.cards[i].id);
   return backs(step.player)[step.before.hands[step.player].length+i];
@@ -35,6 +53,8 @@ function destination(step,i){
 export async function animateStep(step,{render,cardElement,signal,motionEnabled=true}) {
   if(signal.aborted)return;
   if(!motionEnabled||matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){render(step.after,null);return;}
+  resetHandTilt(document.getElementById('hand'));
+  if(step.type==='deal')render(step.before,{type:'deal',player:-1});
   const sources=step.cards.map((_,i)=>pose(source(step,i))||(step.type==='play'?rect(document.querySelector(`.seat-${step.player}`)):null)||fallback());
   const pile=sources.length?{
     x:sources.reduce((sum,p)=>sum+p.x+p.width/2,0)/sources.length-sources.at(-1).width/2,
@@ -44,10 +64,10 @@ export async function animateStep(step,{render,cardElement,signal,motionEnabled=
   render(step.after,{type:step.type,player:step.player,beforeCounts:step.before.hands.map(h=>h.length)});
   const targets=step.cards.map((_,i)=>step.type==='sleep'?null:destination(step,i));
   const destinations=targets.map((target,i)=>{
-    const from=sources[i];
+    const from=sources[i],recipient=step.recipients?.[i]?.player??step.player;
     let to=step.type==='sleep'?{...from,x:innerWidth-45,y:Math.min(innerHeight-50,from.y+110),width:15,height:22}:pose(target)||rect(document.querySelector(`.seat-${step.player}`))||fallback();
     // Keep an offscreen hand destination at its visible edge; scrolling stays user-controlled.
-    if(step.player===0 && step.type!=='play' && step.type!=='sleep'){
+    if(recipient===0 && step.type!=='play' && step.type!=='sleep'){
       const hand=rect(document.getElementById('hand'));
       if(hand)to={...to,x:Math.min(Math.max(to.x,hand.x+10),hand.x+hand.width-to.width-10)};
     }
@@ -58,8 +78,12 @@ export async function animateStep(step,{render,cardElement,signal,motionEnabled=
     x:destinations.reduce((sum,p)=>sum+p.x+p.width/2,0)/destinations.length-pile.width/2,
     y:destinations.reduce((sum,p)=>sum+p.y+p.height/2,0)/destinations.length-pile.height/2
   }:pile;
+  const layer=document.getElementById('card-motion');
+  // An unavailable animation surface must still settle on the committed view.
+  if(!layer || typeof layer.animate!=='function'){render(step.after,null);return;}
+  const visibility=targets.map(n=>n?.style.visibility);
   targets.forEach(n=>{if(n)n.style.visibility='hidden';});
-  const layer=document.getElementById('card-motion');layer.dataset.motion=step.type;
+  const owner=Symbol('flight');layer.motionOwner=owner;layer.dataset.motion=step.type;
   const animations=[],shells=[];
   const cancel=()=>animations.forEach(a=>a.cancel());
   signal.addEventListener('abort',cancel,{once:true});
@@ -70,20 +94,25 @@ export async function animateStep(step,{render,cardElement,signal,motionEnabled=
       shell.style.width='93px';shell.style.height='136px';
       const lift=document.createElement('div');lift.className='flying-lift';
       const turn=document.createElement('div');turn.className='flying-turn';
-      const privateDraw=step.type==='refill' && step.player!==0;
+      const recipient=step.recipients?.[i]?.player??step.player;
+      const drawing=step.type==='refill'||step.type==='deal';
+      const privateDraw=drawing && recipient!==0;
       const front=privateDraw?document.createElement('div'):cardElement(card),back=document.createElement('div');
       if(privateDraw) front.className='anonymous-flight';
       front.classList.add('flight-front');back.className='flight-back';turn.append(front,back);lift.append(turn);shell.append(lift);layer.append(shell);shells.push(shell);
-      const beginBack=step.type==='refill'||(step.type==='play'&&step.player!==0);
-      const endBack=step.type==='sleep'||(step.type!=='play'&&step.player!==0);
+      const beginBack=drawing||(step.type==='play'&&step.player!==0);
+      const endBack=step.type==='sleep'||(step.type!=='play'&&recipient!==0);
       const pickup=step.type==='pickup',play=step.type==='play';
-      const duration=step.type==='sleep'?650:pickup?1000:step.type==='refill'?650:760;
-      const delay=pickup?0:i*Math.min(48,250/Math.max(1,step.cards.length-1));
+      const duration=step.type==='sleep'?650:pickup?1000:drawing?650:760;
+      const delay=step.type==='deal'?i*28:pickup?0:i*Math.min(48,250/Math.max(1,step.cards.length-1));
       const easing='cubic-bezier(.25,.05,.25,1)';
       const frame=(box,offset,angle=box.angle||0)=>({transform:transform(box,angle),offset,opacity:1,easing});
       const end=frame(to,1);end.opacity=step.type==='sleep'?0:1;
       let path;
-      if(pickup){
+      if(drawing){
+        path=bezierPoses(from,to,Math.min(95,Math.hypot(to.x-from.x,to.y-from.y)*.18+25))
+          .map(box=>({...frame(box,box.offset),easing:'linear'}));
+      }else if(pickup){
         // All cards gather on the felt on the same clock, then leave as a stack.
         // Bound the stack thickness even for the largest possible pickup.
         const edge=i*Math.min(.55,9/Math.max(1,step.cards.length-1));
@@ -99,7 +128,8 @@ export async function animateStep(step,{render,cardElement,signal,motionEnabled=
         if(play)path.push(frame({...to,y:to.y-1},.86,(to.angle||0)+1.2));
         path.push(end);
       }
-      const movement=shell.animate(path,{duration,delay,fill:'both'});
+      const movement=shell.animate(path,{duration,delay,fill:'both',easing:drawing?'cubic-bezier(.22,.61,.36,1)':'linear'});
+      animations.push(movement);
       const contact='0 3px 3px #0003,1px 6px 9px #0004';
       const raised='2px 15px 22px #0004,0 5px 9px #0002';
       const tilt=(offset,x,y,shadow)=>({offset,transform:`perspective(700px) rotateX(${x}deg) rotateY(${y}deg)`,boxShadow:shadow,easing});
@@ -109,14 +139,17 @@ export async function animateStep(step,{render,cardElement,signal,motionEnabled=
       if(play)liftFrames.push(tilt(.86,-1,0,contact));
       liftFrames.push(tilt(1,0,0,contact));
       const elevation=lift.animate(liftFrames,{duration,delay,fill:'both'});
+      animations.push(elevation);
       const flip=turn.animate([{transform:`rotateY(${beginBack?180:0}deg)`},{transform:`rotateY(${endBack?180:0}deg)`}],{duration:duration*(pickup ? .5 : .7),delay:delay+duration*(pickup ? .4 : .15),easing:'ease-in-out',fill:'both'});
-      animations.push(movement,elevation,flip);
+      animations.push(flip);
     });
     if(signal.aborted)cancel();
     await Promise.allSettled(animations.map(a=>a.finished));
   } finally {
+    if(signal.aborted)resetHandLayout(document.getElementById('hand'));
     signal.removeEventListener('abort',cancel);animations.forEach(a=>a.cancel());shells.forEach(n=>n.remove());
-    targets.forEach(n=>{if(n)n.style.visibility='';});delete layer.dataset.motion;
+    targets.forEach((n,i)=>{if(n)n.style.visibility=visibility[i];});
+    if(layer.motionOwner===owner){delete layer.dataset.motion;delete layer.motionOwner;}
     if (!signal.aborted) render(step.after,null);
   }
 }

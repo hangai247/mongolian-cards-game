@@ -38,3 +38,26 @@
  .ger-table .hand.wide-hand .card.selected,
 .ger-table .hand.wide-hand .card.selected:hover:not(:disabled) {transform:translateY(-8px)}
 }
+/* One spring controller owns hover lift, tilt, and selection's fan straightening. */
+.ger-table #hand.spring-hand {perspective:900px;perspective-origin:50% 100%}
+.ger-table #hand.spring-hand .card {
+ --selection-progress:0;
+ --card-rise:12px;
+ transform:var(--hand-layout,translate(0px,0px)) translateY(calc(var(--lift,0px) * (1 - var(--selection-progress)))) rotate(calc(var(--fan,0deg) * (1 - var(--selection-progress))));
+ transition:box-shadow .24s;
+}
+.ger-table #hand.spring-hand.wide-hand .card {--card-rise:8px}
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+ .ger-table #hand.spring-hand .card.hover-raised:not(.selected) {
+  box-shadow:0 1px 0 #fff0d4,0 2px 0 #b39a79,2px 12px 17px #0005;
+ }
+}
+.ger-table #hand.spring-hand .card.hover-raised {z-index:5}
+.ger-table #hand.spring-hand .card.selected {--selection-progress:1;translate:0 calc(-1 * var(--card-rise))}
+.ger-table #hand.spring-hand .card.spring-tilting {will-change:rotate,translate,transform;transition:box-shadow .24s}
+.ger-table #hand.spring-hand .card.spring-tilting:not(.hover-raised) {z-index:4}
+.ger-table #hand.spring-hand .card.spring-layout:not(.spring-tilting) {will-change:transform}
+@media(prefers-reduced-motion:reduce) {
+ .ger-table #hand.spring-hand .card {rotate:none!important;translate:none!important;transition:none!important}
+ .ger-table #hand.spring-hand .card.selected {translate:0 calc(-1 * var(--card-rise))!important}
+}

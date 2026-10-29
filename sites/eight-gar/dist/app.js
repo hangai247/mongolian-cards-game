@@ -1,3 +1,4 @@
+import { makePlayingCard } from './card-system.js';
 import { createSleepNotice, renderSleepFeedback, hostName, voiceCaption } from './table-feedback.js';
 import { mountLobbyViewport } from './lobby-entry.js?v=lobby1';
 import { controlIcon, setActionButton, computerBadge, renderComputerMessage } from './control-icons.js';
@@ -9,8 +10,12 @@ import { layoutTablePile } from './viewport-table.js?v=ger3';
 /** Networked table controller. The server is authoritative; this file renders views, animates committed
  *  transitions and sends intents. It never holds another player's cards. */
 import { RANKS, SUITS, JOKERS, applyAction } from './engine.js';
-import { transitionSteps, fanLayout } from './presentation.js';
-import { animateStep } from './motion.js';
+import { transitionSteps, fanLayout, dealStep } from './presentation.js';
+import { animateStep, waitForDealLayout } from './motion.js';
+import { createPresentationQueue } from './presentation-queue.js';
+import { reconcileHand } from './hand-view.js';
+import { createUiClock } from './ui-clock.js';
+import { invalidatePileInspection } from './pile-inspection.js';
 import { sceneFromView, localizeEvents, prepareForTransition, displaySeat, realSeat } from './scene.js';
 import * as net from './net.js';
 import { createVoice } from './voice.js?v=levels1';
@@ -32,7 +37,7 @@ const openerSelection = mountOpenerSelection({ container: $('opening-players'), 
 // The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
 function renderConfirmOpener() {
   const chosen = openerSelection.value;
-  $('confirm-opener').disabled = chosen === null || confirmPending || !connected;
+  $('confirm-opener').disabled = chosen === null || confirmPending || animating || presentationQueue.busy || !connected;
   $('confirm-opener').textContent = chosen === null ? 'Эхлэгчээ сонгоно уу' : `${chosen === 0 ? 'Та' : names[chosen].replace(/\s*\(компьютер\)$/, '')} эхэлнэ · батлах →`;
 }
 const SYMBOLS = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣' };
@@ -43,8 +48,11 @@ const ENGINE_EVENTS = new Set(['played', 'picked-up', 'refilled', 'table-slept']
 let session = null, client = null, room = null, latestView = null, me = 0, names = defaultNames(), connected = false;
 // Rendered scene (display coordinates) and animation state
 let scene = null, selected = new Set(), liveMove = '', byRank = false, toastTimer = null;
-let animating = false, motionController = null, motionEpoch = 0, rosterDirty = false;
-let pendingUpdates = [], processing = false;
+let animating = false, rosterDirty = false, acceptedVersion = -1;
+const presentationQueue = createPresentationQueue({
+  run: presentUpdate,
+  onIdle() { render(); maybeShowRound(); },
+});
 // Timers from the server (epoch ms on the server clock)
 let deadline = null, deadlineSpan = null, timerKind = null, reviewUntil = null;
 // The server sends only the deadline, so countdown rings measure from the moment a new deadline arrives.
@@ -57,7 +65,7 @@ let pendingAction = null, continuePending = false, confirmPending = false;
 let latestCharacterState = null;
 const signalControls = createOnlineSignalControls({ container: document.querySelector('.hand-zone'), onError: toast });
 let characterRoom = { update(...args) { latestCharacterState = args; } };
-import('./photographic-room.js?v=speaking2').then(({ CharacterRoom }) => {
+const characterReady = import('./photographic-room.js?v=speaking2').then(({ CharacterRoom }) => {
   characterRoom = new CharacterRoom($('character-room'));
   if (latestCharacterState) characterRoom.update(...latestCharacterState);
   applySpeaking();
@@ -72,12 +80,7 @@ const store = (key, value) => { try { value === null ? localStorage.removeItem(k
 const read = key => { try { return localStorage.getItem(key); } catch { return null; } };
 
 function cardElement(card, interactive = false) {
-  const element = document.createElement(interactive ? 'button' : 'div');
-  const red = card.kind === 'joker' ? card.color === 'red' : ['hearts', 'diamonds'].includes(card.suit);
-  element.className = `card${red ? ' red' : ''}${card.kind === 'joker' ? ` joker ${card.color}` : ''}`;
-  element.setAttribute('aria-label', cardLabel(card));
-  if (card.kind === 'ordinary') element.dataset.rank = card.rank;
-  if (!interactive) element.dataset.publicId = card.id;
+  const element = makePlayingCard(card, interactive);
   if (interactive) {
     element.type = 'button'; element.dataset.cardId = card.id;
     element.classList.toggle('selected', selected.has(card.id));
@@ -89,12 +92,6 @@ function cardElement(card, interactive = false) {
       document.querySelector(`[data-card-id="${CSS.escape(card.id)}"]`)?.focus({ preventScroll: true });
     });
   }
-  const rank = card.kind === 'joker' ? 'ЖОКЕР' : card.rank;
-  const symbol = card.kind === 'joker' ? '✧' : SYMBOLS[card.suit];
-  const face = card.kind === 'ordinary' && ['J', 'Q', 'K'].includes(card.rank);
-  const pipCount = card.kind === 'joker' ? 0 : Number(card.rank);
-  const center = face ? `<span class="face-emblem">${card.rank === 'Q' ? '♛' : card.rank === 'K' ? '♚' : '♞'}</span><span class="face-suit">${symbol}</span>` : pipCount >= 2 && pipCount <= 10 ? `<span class="pips pips-${pipCount}">${Array.from({length:pipCount}, () => `<i>${symbol}</i>`).join('')}</span>` : `<span class="card-center">${symbol}</span>`;
-  element.innerHTML = `<span class="card-corner">${rank}<small>${card.kind === 'joker' ? '' : symbol}</small></span>${center}<span class="card-corner card-bottom">${rank}<small>${card.kind === 'joker' ? '' : symbol}</small></span>${card.kind === 'joker' ? `<span class="joker-label">${JOKER_LABELS[card.color]}</span>` : ''}`;
   return element;
 }
 function sortedHand(sceneArg = scene) {
@@ -103,20 +100,13 @@ function sortedHand(sceneArg = scene) {
   return [...sceneArg.hands[0]].sort((a, b) => byRank ? rankIndex(a) - rankIndex(b) || suitIndex(a) - suitIndex(b) : suitIndex(a) - suitIndex(b) || rankIndex(a) - rankIndex(b));
 }
 function renderHand(sceneArg = scene) {
-  const hand = $('hand'), scrollLeft = hand.scrollLeft; hand.replaceChildren();
-  if (!sceneArg) { for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } $('hand-count').textContent = 'Эхлэхэд 5 хөзөр'; return; }
+  const hand = $('hand');
+  if (!sceneArg) { hand.replaceChildren(); for (let i = 0; i < 5; i++) { const card = document.createElement('div'); card.className = 'card placeholder-card'; card.setAttribute('aria-hidden', 'true'); hand.append(card); } $('hand-count').textContent = 'Эхлэхэд 5 хөзөр'; return; }
   const cards = sortedHand(sceneArg);
-  hand.classList.toggle('wide-hand', cards.length > 9);
-  hand.style.setProperty('--hand-size', cards.length);
-  hand.dataset.count = cards.length;
-  cards.forEach((card, index) => {
-    const element = cardElement(card, true);
-    const position = index - (cards.length - 1) / 2;
-    element.style.setProperty('--fan', `${cards.length > 9 ? 0 : position * 4}deg`);
-    element.style.setProperty('--lift', `calc(var(--hand-card-height,250px) * ${cards.length > 9 ? 0 : Math.abs(position) ** 1.7 * .008})`);
-    hand.append(element);
+  reconcileHand(hand, cards, {
+    create: card => cardElement(card, true), selected,
+    disabled: sceneArg.turn !== 0 || sceneArg.phase !== 'playing' || animating || !connected || !!pendingAction,
   });
-  hand.scrollLeft = scrollLeft;
   $('hand-count').textContent = `${sceneArg.hands[0].length} хөзөр`;
   const sortLabel = byRank ? 'Тамгаар эрэмбэлэх' : 'Чансаагаар эрэмбэлэх';
   setActionButton($('sort'), sortLabel, 'sort');
@@ -129,9 +119,11 @@ function playError() {
 }
 
 function renderActions() {
-  const active = scene?.phase === 'playing' && scene.turn === 0 && !animating && connected;
+  const active = scene?.phase === 'playing' && scene.turn === 0 && !animating && !presentationQueue.busy && connected;
+  for (const card of $('hand').querySelectorAll('[data-card-id]')) card.disabled = !active || !!pendingAction;
   for (const id of ['new-match', 'rules-open', 'sort']) $(id).disabled = animating;
   $('felt').setAttribute('aria-busy', String(animating));
+  $('hand').setAttribute('aria-busy', String(animating));
   const error = active ? playError() : null;
   $('play').disabled = !active || selected.size === 0 || !!error || !!pendingAction;
   $('pickup').disabled = !active || scene.table.pile.length === 0 || !!pendingAction;
@@ -225,7 +217,7 @@ function render(sceneArg = scene, motion = null) {
   else if (sceneArg && sceneArg.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'Шинээр эхэлнэ.'; $('highest').append(empty); }
   layoutTablePile($('highest'));
   $('turn-label').textContent = !sceneArg ? 'ТАНЫ СУУДАЛ БЭЛЭН' : sceneArg.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : sceneArg.phase === 'match-over' ? 'ТОГЛОЛТ ДУУСЛАА' : sceneArg.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : sceneArg.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${names[sceneArg.turn].toUpperCase()} · ЭЭЛЖ`;
-  if (motion) $('turn-label').textContent = ({ pickup: 'ХӨЗӨР АВЧ БАЙНА', play: 'ХӨЗӨР ТАВЬЖ БАЙНА', refill: 'НӨӨЦӨӨС НӨХӨЖ БАЙНА', sleep: 'УНТАНА' })[motion.type];
+  if (motion) $('turn-label').textContent = ({ pickup: 'ХӨЗӨР АВЧ БАЙНА', play: 'ХӨЗӨР ТАВЬЖ БАЙНА', refill: 'НӨӨЦӨӨС НӨХӨЖ БАЙНА', sleep: 'УНТАНА', deal: 'ХӨЗӨР ТАРААЖ БАЙНА' })[motion.type];
   renderComputerMessage($('turn-label'), $('turn-label').textContent);
   renderSleepFeedback(sceneArg, motion, sleepNotice);
   $('reserve-count').textContent = sceneArg?.reserve.length ?? 3;
@@ -312,11 +304,7 @@ function renderTimer() {
   timer.closest('.turn-hud')?.style.setProperty('--turn-progress', progress);
   document.querySelector('#seats .seat.active')?.style.setProperty('--turn-progress', progress);
 }
-function tick() {
-  if (session) { renderTimer(); updateRoundControls(); updateDiscussionCountdown(); }
-  requestAnimationFrame(tick);
-}
-requestAnimationFrame(tick);
+const uiClock = createUiClock(() => { renderTimer(); updateRoundControls(); updateDiscussionCountdown(); });
 function applySpeaking() {
   for (let index = 0; index < 8; index++) {
     const info = seatInfo(index);
@@ -465,6 +453,7 @@ async function createOrJoin(kind) {
 // ---- Room lifecycle ----
 function enterRoom(result) {
   sleepNotice.clear();
+  presentationQueue.reset(); acceptedVersion = -1;
   session = result; me = result.seat; room = null; latestView = null; scene = null; names = defaultNames();
   net.saveSession(result);
   if (codeFromUrl() !== result.code) history.replaceState(null, '', `/r/${result.code}`);
@@ -492,7 +481,7 @@ function enterRoom(result) {
   });
   voice.onSpeakers((ids, levels) => { speakingIds = new Set(ids); speakingLevels = levels; applySpeaking(); });
   voice.onParticipants(members => { voiceMembers = members; if (!animating) render(); });
-  render();
+  render(); uiClock.setEnabled(true);
 }
 function leaveLocally(message) {
   sleepNotice.clear();
@@ -500,10 +489,11 @@ function leaveLocally(message) {
   if (session) net.clearSession(session.code);
   client?.close(); client = null;
   void voice?.destroy(); voice = null; voiceInfo = { state: 'off', micOn: false, micWanted: false, micBlocked: false, audioBlocked: false }; speakingIds = new Set(); speakingLevels = new Map(); voiceMembers = new Map();
-  motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = []; processing = false;
+  presentationQueue.reset(); animating = false; acceptedVersion = -1; uiClock.setEnabled(false);
   session = null; room = null; latestView = null; scene = null; me = 0; names = defaultNames(); connected = false;
   deadline = null; timerKind = null; reviewUntil = null; liveMove = ''; selected.clear(); pendingAction = null;
   if ($('round-dialog').open) $('round-dialog').close();
+  invalidatePileInspection($('pile-dialog'), $('pile-cards'), []);
   history.replaceState(null, '', '/');
   setEntryMode('');
   render();
@@ -513,6 +503,8 @@ function updateNames() {
   names = Array.from({ length: 8 }, (_, d) => d === 0 ? 'Та' : seatName(seatInfo(d)));
 }
 function onRoomState(payload) {
+  if (payload.version < acceptedVersion) return;
+  acceptedVersion = payload.version;
   const previousHost = room?.seats.find(seat => seat.isHost)?.playerId;
   room = payload; me = payload.you.seat; updateNames();
   const currentHost = room.seats.find(seat => seat.isHost)?.playerId;
@@ -524,25 +516,34 @@ function onRoomState(payload) {
   if (payload.game) {
     setDeadline(payload.game.deadline); timerKind = payload.game.timer; reviewUntil = payload.game.reviewUntil;
     const incoming = payload.game.view;
+    checkPileInspection(incoming.table.pile);
     const known = latestView && latestView.revision === incoming.revision && latestView.round === incoming.round;
     if (!known) {
       sleepNotice.clear();
       // Resync: whatever we were animating is stale. Replace the scene without animation.
-      motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = [];
-      latestView = incoming; scene = sceneFromView(incoming); selected.clear();
+      presentationQueue.reset(); animating = false;
+      latestView = incoming; scene = sceneFromView(incoming); selected.clear(); pendingAction = null;
       if ($('round-dialog').open && !['round-over', 'match-over'].includes(scene.phase)) $('round-dialog').close();
     }
   } else if (scene) {
-    motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = [];
+    checkPileInspection([]);
+    presentationQueue.reset(); animating = false;
     latestView = null; scene = null; selected.clear(); liveMove = ''; deadline = null; timerKind = null; reviewUntil = null;
   }
   if (animating) { rosterDirty = true; return; }
   render(); maybeShowRound();
 }
 function onGameUpdate(update) {
+  if (update.version <= acceptedVersion) return;
+  acceptedVersion = update.version;
+  checkPileInspection(update.view.table.pile);
   latestView = update.view; setDeadline(update.deadline); timerKind = update.timer; reviewUntil = update.reviewUntil;
-  pendingUpdates.push(update);
-  processQueue();
+  void presentationQueue.enqueue(update);
+}
+function checkPileInspection(pile) {
+  if (invalidatePileInspection($('pile-dialog'), $('pile-cards'), pile)) {
+    toast('Ширээний хөзөр өөрчлөгдлөө. Шинэ нүүдлийг ширээнээс хараарай.');
+  }
 }
 function describe(update, events, previous) {
   const actorEvent = events.find(e => e.type === 'played' || e.type === 'picked-up');
@@ -563,62 +564,67 @@ function describe(update, events, previous) {
     if (event.type === 'rematch') liveMove = 'Шинэ тоглолт эхэллээ. Суудал хэвээр, хөзрийг дахин тараана.';
   }
 }
-async function processQueue() {
-  if (processing) { if (pendingUpdates.length > 1) motionController?.abort(); return; }
-  processing = true;
+async function presentUpdate(update, { signal, isCurrent, skipMotion }) {
+  if (!isCurrent()) return;
+  const events = localizeEvents(update.events, me);
+  const engineEvents = events.filter(e => ENGINE_EVENTS.has(e.type));
+  const previous = scene;
+  sleepNotice.clear();
+  describe(update, events, previous);
+  if (events.some(e => e.type === 'round-dealt' || e.type === 'rematch') && $('round-dialog').open) $('round-dialog').close();
+  const next = sceneFromView(update.view);
+  // Events only describe the immediately preceding revision. Gaps use the full snapshot.
+  const dealing = next.phase === 'choosing-leader' && events.some(e => e.type === 'round-dealt') && !skipMotion && !document.hidden;
+  const animate = previous && engineEvents.length > 0 && !skipMotion && !document.hidden
+    && previous.round === next.round && previous.revision + 1 === next.revision;
+  scene = next; selected.clear(); pendingAction = null;
   try {
-    while (pendingUpdates.length) {
-      const update = pendingUpdates.shift();
-      const jump = pendingUpdates.length > 0 || document.hidden;
-      const events = localizeEvents(update.events, me);
-      const engineEvents = events.filter(e => ENGINE_EVENTS.has(e.type));
-      const previous = scene;
-      sleepNotice.clear();
-      describe(update, events, previous);
-      if (events.some(e => e.type === 'round-dealt' || e.type === 'rematch') && $('round-dialog').open) $('round-dialog').close();
-      const next = sceneFromView(update.view);
-      const animate = previous && engineEvents.length > 0 && !jump && previous.round === next.round && previous.revision < next.revision;
-      scene = next; selected.clear(); pendingAction = null;
-      if (animate) {
-        const start = prepareForTransition(previous, events);
-        const token = ++motionEpoch;
-        animating = true; motionController = new AbortController();
-        renderActions();
-        try {
-          for (const step of transitionSteps(start, engineEvents)) {
-            if (motionController.signal.aborted || token !== motionEpoch) break;
-            await animateStep(step, { render, cardElement, signal: motionController.signal });
-          }
-        } catch (error) { console.error(error); }
-        finally { if (token === motionEpoch) { animating = false; motionController = null; } }
+    if (dealing) {
+      animating = true;
+      const step = dealStep(next);
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        render(step.before, { type: 'deal', player: -1 });
+        if (!await waitForDealLayout(characterReady, signal)) return;
       }
-      if (!jump && !pendingUpdates.length && scene === next && events.some(event => event.type === 'table-slept')) sleepNotice.show();
+      if (isCurrent() && !signal.aborted) await animateStep(step, { render, cardElement, signal });
+    } else if (animate) {
+      animating = true;
+      renderActions();
+      const start = prepareForTransition(previous, events);
+      for (const step of transitionSteps(start, engineEvents)) {
+        if (!isCurrent() || signal.aborted) break;
+        await animateStep(step, { render, cardElement, signal });
+      }
+    }
+  } finally {
+    // A full sync/room change owns the scene now; an old worker must not touch it.
+    if (isCurrent()) {
+      animating = false;
+      if (!signal.aborted && !presentationQueue.hasPending && events.some(event => event.type === 'table-slept')) sleepNotice.show();
       if (rosterDirty) { rosterDirty = false; updateNames(); }
       render();
     }
-  } finally {
-    processing = false;
-    render(); maybeShowRound();
   }
 }
 
 // ---- Intents ----
 async function commit(move) {
-  if (!scene || scene.phase !== 'playing' || animating || !client || pendingAction) return;
-  const key = JSON.stringify({ ...move, revision: latestView.revision });
-  // Reuse the action id when retrying the same move so a reconnect cannot double-submit.
-  const actionId = pendingAction?.key === key ? pendingAction.actionId : crypto.randomUUID();
-  pendingAction = { key, actionId };
+  if (!scene || scene.phase !== 'playing' || scene.turn !== 0 || animating || presentationQueue.busy || !client || !connected || pendingAction) return;
+  const connection = client;
+  const actionId = crypto.randomUUID();
+  const intent = { actionId };
+  pendingAction = intent;
   renderActions();
   try {
     const payload = move.type === 'play'
       ? { cards: move.cards, expectedRevision: latestView.revision, actionId }
       : { expectedRevision: latestView.revision, actionId };
-    await client.request(move.type === 'play' ? 'game:play' : 'game:pickup', payload);
+    await connection.request(move.type === 'play' ? 'game:play' : 'game:pickup', payload);
   } catch (error) {
+    if (client !== connection || pendingAction !== intent) return;
     pendingAction = null;
     toast(errorText(error));
-    if (error.code === 'STALE_ACTION' || error.code === 'TIMEOUT') client.request('room:sync', {}).catch(() => {});
+    if (error.code === 'STALE_ACTION' || error.code === 'TIMEOUT') connection.request('room:sync', {}).catch(() => {});
     renderActions();
   }
 }
@@ -634,7 +640,7 @@ function renderDiscussion(sceneArg = scene) {
   $('human-discussion').hidden = !ours;
   $('computer-discussion').hidden = ours;
   if (ours) {
-    openerSelection.render({ key: `${session?.code}:${sceneArg.round}:${me}`, entries: [0, 2, 4, 6].map(seat => ({ seat, name: seat === 0 ? 'Та' : names[seat], count: sceneArg.hands[seat].length })), busy: confirmPending || !connected });
+    openerSelection.render({ key: `${session?.code}:${sceneArg.round}:${me}`, entries: [0, 2, 4, 6].map(seat => ({ seat, name: seat === 0 ? 'Та' : names[seat], count: sceneArg.hands[seat].length })), busy: confirmPending || animating || presentationQueue.busy || !connected });
     renderConfirmOpener();
   }
   updateDiscussionCountdown();
@@ -647,14 +653,14 @@ function updateDiscussionCountdown() {
   if ($('discussion-note').textContent !== text) $('discussion-note').textContent = text;
 }
 async function confirmOpeningPlayer(display) {
-  if (scene?.phase !== 'choosing-leader' || !client || confirmPending) return;
+  if (scene?.phase !== 'choosing-leader' || !client || !connected || confirmPending || animating || presentationQueue.busy) return;
   confirmPending = true; renderDiscussion();
   try { await client.request('game:confirmLeader', { leader: realSeat(display, me), expectedRevision: latestView.revision }); }
   catch (error) { toast(error.code === 'STALE_ACTION' || error.code === 'BAD_PHASE' ? 'Багийн тоглогч эхлэх тоглогчийг аль хэдийн баталсан байна.' : errorText(error)); }
   finally { confirmPending = false; renderDiscussion(); }
 }
 function maybeShowRound() {
-  if (!scene || processing || animating) return;
+  if (!scene || presentationQueue.busy || animating) return;
   if (['round-over', 'match-over'].includes(scene.phase)) showRound();
   else if ($('round-dialog').open) $('round-dialog').close();
 }
@@ -665,6 +671,7 @@ function showRound() {
   $('result-title').textContent = won ? matchOver ? 'Танай баг яллаа!' : 'Танай баг нэг хожил авлаа.' : matchOver ? 'Сайхан тоглолт боллоо.' : 'Эсрэг баг нэг хожил авлаа.';
   $('result-detail').textContent = `${names[scene.turn]} бүх хөзрөө дуусгалаа. ${scene.scores[0]}–${scene.scores[1]}${matchOver ? ' — түрүүлж таван үе хожсон баг ялна.' : ` · Дараагийн хөзөр: ${SYMBOLS[SUITS[scene.round % 4]]} ${LABELS[SUITS[scene.round % 4]]}.`}`;
   if (!$('round-dialog').open) $('round-dialog').show();
+  characterRoom.resize?.();
   updateRoundControls();
 }
 let lastReviewText = '';
@@ -706,6 +713,7 @@ function openDialog(id) { if (animating) return; $(id).showModal(); }
 $('rules-open').addEventListener('click', () => openDialog('rules-dialog'));
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => button.closest('dialog').close());
 $('pile-open').addEventListener('click', () => { if (!scene) return; $('pile-cards').replaceChildren(...scene.table.pile.map(card => cardElement(card))); openDialog('pile-dialog'); });
+$('pile-dialog').addEventListener('close', () => $('pile-cards').replaceChildren());
 $('create').addEventListener('click', () => createOrJoin('create'));
 $('join').addEventListener('click', () => createOrJoin('join'));
 $('lobby-code').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); createOrJoin('join'); } });
@@ -723,9 +731,11 @@ $('audio-resume').addEventListener('click', async () => { await voice?.resumeAud
 $('sort').addEventListener('click', () => { byRank = !byRank; store(SORT_KEY, byRank ? '1' : '0'); if (scene) renderHand(); });
 $('play').addEventListener('click', () => { if (scene?.turn === 0 && selected.size) commit({ type: 'play', cards: [...selected] }); });
 $('pickup').addEventListener('click', () => { if (scene?.turn === 0) commit({ type: 'pickup' }); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) motionController?.abort(); });
-window.addEventListener('resize', () => motionController?.abort());
-matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => motionController?.abort());
+document.addEventListener('visibilitychange', () => { if (document.hidden) presentationQueue.cancelMotion(); });
+window.addEventListener('resize', () => presentationQueue.cancelMotion());
+window.addEventListener('pagehide', () => { presentationQueue.cancelMotion(); uiClock.setEnabled(false); });
+window.addEventListener('pageshow', () => uiClock.setEnabled(!!session));
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => presentationQueue.cancelMotion());
 window.addEventListener('popstate', () => { if (!session) setEntryMode(codeFromUrl()); });
 
 // ---- Boot ----
