@@ -1,7 +1,8 @@
+import { createSleepNotice, renderSleepFeedback, hostName, voiceCaption } from './table-feedback.js';
 import { mountLobbyViewport } from './lobby-entry.js?v=lobby1';
 import { controlIcon, setActionButton, computerBadge, renderComputerMessage } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
-import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText, seatName } from './locale-mn.js';
+import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText, seatName } from './locale-mn.js?v=feedback1';
 import { isOpenSeat, teamGroups, switchTeamTarget } from './lobby-teams.js';
 import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
@@ -18,6 +19,7 @@ import { createOnlineSignalControls } from './online-signals.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, avatarImage, renderSelfAvatar } from './avatar-picker.js';
 
 const $ = id => document.getElementById(id);
+const sleepNotice = createSleepNotice(() => { if (!animating) render(); });
 mountLobbyViewport();
 const entryPicker = mountAvatarPicker($('entry-avatar-picker'), { value: rememberedAvatar(), previewHost: $('entry-avatar-preview'), onChange: rememberAvatar });
 const lobbyPicker = mountAvatarPicker($('lobby-avatar-picker'), { onChange: async avatarId => {
@@ -136,9 +138,10 @@ function renderActions() {
   document.body.dataset.selection = String(selected.size);
   document.body.classList.toggle('my-turn', !!active);
   setActionButton($('pickup'), scene?.table.pile.length ? `${scene.table.pile.length} хөзөр авах` : 'Авах', 'cards');
-  if (animating) $('guidance').textContent = '';
+  if (session && scene && !connected) $('guidance').textContent = 'Ширээнд дахин холбогдож байна…';
+  else if (animating) $('guidance').textContent = '';
   else if (!session) $('guidance').textContent = 'Хөзрөө харахын тулд ширээ нээх эсвэл ширээнд нэгдээрэй.';
-  else if (!scene) $('guidance').textContent = 'Тоглогчдыг хүлээж байна. Ширээ нээсэн хүн тоглолт эхлүүлэхэд хөзөр тараана.';
+  else if (!scene) $('guidance').textContent = 'Тоглогчдыг хүлээж байна. Зохион байгуулагч тоглолт эхлүүлэхэд хөзөр тараана.';
   else if (!connected) $('guidance').textContent = 'Ширээнд дахин холбогдож байна…';
   else if (scene.phase === 'choosing-leader') $('guidance').textContent = 'Хөзөр тараалаа. Эхлэх багийн шийдвэрийг хүлээж байна.';
   else if (scene.phase !== 'playing') $('guidance').textContent = scene.winner === 0 ? 'Энэ үед танай баг хожлоо.' : 'Энэ үед эсрэг баг хожлоо.';
@@ -219,14 +222,16 @@ function render(sceneArg = scene, motion = null) {
   }
   else if (sceneArg && sceneArg.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'Шинээр эхэлнэ.'; $('highest').append(empty); }
   layoutTablePile($('highest'));
-  $('turn-label').textContent = !sceneArg ? 'ТАНЫ СУУДАЛ БЭЛЭН' : sceneArg.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : sceneArg.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : sceneArg.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${names[sceneArg.turn].toUpperCase()} · ЭЭЛЖ`;
+  $('turn-label').textContent = !sceneArg ? 'ТАНЫ СУУДАЛ БЭЛЭН' : sceneArg.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : sceneArg.phase === 'match-over' ? 'ТОГЛОЛТ ДУУСЛАА' : sceneArg.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : sceneArg.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${names[sceneArg.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({ pickup: 'ХӨЗӨР АВЧ БАЙНА', play: 'ХӨЗӨР ТАВЬЖ БАЙНА', refill: 'НӨӨЦӨӨС НӨХӨЖ БАЙНА', sleep: 'УНТАНА' })[motion.type];
   renderComputerMessage($('turn-label'), $('turn-label').textContent);
+  renderSleepFeedback(sceneArg, motion, sleepNotice);
   $('reserve-count').textContent = sceneArg?.reserve.length ?? 3;
   $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = sceneArg?.table.pile.length ?? 0;
   $('pile-open').disabled = animating || !sceneArg?.table.pile.length;
-  $('table-message').hidden = connected || !session;
+  document.body.classList.toggle('reconnecting', !!session && !connected);
+  $('table-message').hidden = true;
   $('table-message').textContent = 'Холболт тасарлаа. Дахин холбогдож байна…';
   renderComputerMessage($('live-move'), liveMove);
   renderHand(sceneArg);
@@ -237,23 +242,31 @@ function escapeHtml(text) { return String(text).replace(/[&<>"']/g, c => ({ '&':
 
 // ---- Header, timer, voice ----
 function renderHeader() {
+  const hostStatus = $('host-status');
+  if (hostStatus) {
+    hostStatus.hidden = !room;
+    hostStatus.textContent = room ? `Зохион байгуулагч: ${hostName(room)}${room.you.isHost ? ' (та)' : ''}` : '';
+  }
   $('room-badge').hidden = !session;
   if (session) $('room-code').textContent = session.code;
-  $('conn-status').hidden = !session || connected;
+  $('conn-status').hidden = !session || connected || !!scene;
   const voiceOn = !!room?.config?.voice && !!session;
   // The same microphone toggle appears at the table and in the lobby, so a player can unmute before the deal.
-  const icon = voiceInfo.state === 'connecting' ? 'loading' : voiceInfo.micOn ? 'mic' : 'micOff';
-  const label = voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна' : voiceInfo.state === 'error' ? 'Дуут холболт тасарсан'
+  const listen = voiceInfo.audioBlocked && voiceInfo.state === 'on';
+  const icon = listen ? 'sound' : voiceInfo.state === 'connecting' ? 'loading' : voiceInfo.micOn ? 'mic' : 'micOff';
+  const label = listen ? 'Дарж бусдыг сонсох' : voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна' : voiceInfo.state === 'error' ? 'Дуут холболт тасарсан'
     : voiceInfo.micBlocked ? 'Микрофон хаагдсан · дахин оролдох' : voiceInfo.micOn ? 'Микрофон асаалттай' : 'Микрофон хаалттай';
   const title = voiceInfo.state !== 'on' ? 'Дуут сувагт автоматаар дахин холбогдоно' : voiceInfo.micBlocked ? 'Хөтөчдөө микрофон ашиглахыг зөвшөөрөөд дахин дарна уу'
     : voiceInfo.micOn ? 'Дарж микрофоноо хаана уу' : 'Та бусдыг сонсож байна. Ярихын тулд дарж микрофоноо асаана уу';
   for (const button of [$('voice-mic'), $('lobby-mic')]) {
     button.hidden = !voiceOn;
     button.className = `quiet-button voice-button ${voiceInfo.state}${voiceInfo.micOn ? ' live' : ' muted'}${voiceInfo.micBlocked ? ' blocked' : ''}`;
+    button.dataset.caption = voiceCaption(voiceInfo);
     button.innerHTML = `${controlIcon(icon)} <span class="label">${label}</span>`; button.title = title; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(voiceInfo.micOn));
     button.disabled = voiceInfo.state === 'connecting';
   }
-  $('audio-banner').hidden = !voiceOn || !voiceInfo.audioBlocked || voiceInfo.state !== 'on';
+  // The microphone button resumes blocked audio; no banner covers game controls.
+  $('audio-banner').hidden = true;
   $('lobby-voice').hidden = !voiceOn;
   $('lobby-voice-note').textContent = voiceInfo.state === 'connecting' ? 'Дуут сувагт холбогдож байна…'
     : voiceInfo.state === 'error' ? 'Дуут суваг түр тасарлаа. Автоматаар дахин холбогдоно.'
@@ -270,7 +283,7 @@ function micBadge(info, display) {
 }
 async function toggleMic() {
   if (!voice) return;
-  if (voiceInfo.audioBlocked) await voice.resumeAudio();
+  if (voiceInfo.audioBlocked) { await voice.resumeAudio(); return; }
   const on = await voice.setMic(!voiceInfo.micWanted || voiceInfo.micBlocked ? true : false);
   store(MIC_KEY, voice.micWanted ? '1' : '0');
   if (voice.micWanted && !on && voiceInfo.micBlocked) toast('Хөтөч микрофоныг хаасан байна. Энэ сайтад микрофон ашиглахыг зөвшөөрөөд дахин дарна уу.');
@@ -348,7 +361,7 @@ function renderLobby() {
   $('fill-bots').disabled = filled === 8 || !connected;
   $('lobby-status').textContent = room.you.isHost
     ? (filled === 8 ? 'Бүгд суудалдаа орлоо. Бэлэн бол хөзрөө тараагаарай.' : `${humans} тоглогч суусан · ${8 - filled} сул суудал. Компьютероор дүүргэх эсвэл найзуудаа хүлээгээрэй.`)
-    : (filled === 8 ? 'Ширээ нээсэн хүн хөзөр тараахыг хүлээж байна.' : `${humans} тоглогч суусан. Найман суудал дүүрмэгц ширээ нээсэн хүн хөзөр тараана.`);
+    : (filled === 8 ? 'Зохион байгуулагч хөзөр тараахыг хүлээж байна.' : `${humans} тоглогч суусан. Найман суудал дүүрмэгц зохион байгуулагч хөзөр тараана.`);
   const groups = $('seat-list');
   const focused = groups.contains(document.activeElement) ? document.activeElement : null;
   const focusSeat = focused?.dataset.seat, focusAction = focused?.dataset.action;
@@ -446,6 +459,7 @@ async function createOrJoin(kind) {
 
 // ---- Room lifecycle ----
 function enterRoom(result) {
+  sleepNotice.clear();
   session = result; me = result.seat; room = null; latestView = null; scene = null; names = defaultNames();
   net.saveSession(result);
   if (codeFromUrl() !== result.code) history.replaceState(null, '', `/r/${result.code}`);
@@ -453,18 +467,22 @@ function enterRoom(result) {
   client.onState(onRoomState);
   client.onUpdate(onGameUpdate);
   client.onClosed(payload => leaveLocally(payload.reason === 'left' ? 'Та ширээнээс гарлаа.' : 'Ширээ хаагдлаа.'));
+  let hasConnected = false;
   client.onConnection((isConnected, error) => {
+    if (isConnected && !connected && hasConnected) toast('Ширээнд дахин холбогдлоо.');
+    if (isConnected) hasConnected = true;
     connected = isConnected;
     if (!isConnected && error && ['UNAUTHORIZED', 'ROOM_NOT_FOUND', 'ROOM_CLOSED'].includes(error.code)) { leaveLocally('Энэ ширээ хаагдсан байна.'); return; }
     if (!animating) render(); else rosterDirty = true;
   });
   signalControls.connect(client);
   voice = createVoice({ requestToken: () => client.request('voice:token', {}), micPreferred: read(MIC_KEY) === '1' });
-  let voiceWasOn = false;
+  let voiceWasOn = false, voiceOutage = false;
   voice.onState(info => {
     voiceInfo = info; renderHeader();
     if (info.state === 'on' && !voiceWasOn) { voiceWasOn = true; toast(info.micOn ? 'Дуут сувагт холбогдлоо. Таны микрофон асаалттай.' : 'Дуут сувагт холбогдлоо. Та бусдыг сонсоно; ярихын тулд микрофоноо асаагаарай.'); }
-    if (info.state === 'error') toast('Дуут холболт тасарлаа. Дахин холбогдож байна…');
+    if (info.state === 'on') voiceOutage = false;
+    if (info.state === 'error' && !voiceOutage) { voiceOutage = true; toast('Дуут холболт тасарлаа. Дахин холбогдож байна…'); }
     if (!animating) render();
   });
   voice.onSpeakers(ids => { speakingIds = new Set(ids); applySpeaking(); });
@@ -472,6 +490,7 @@ function enterRoom(result) {
   render();
 }
 function leaveLocally(message) {
+  sleepNotice.clear();
   signalControls.close();
   if (session) net.clearSession(session.code);
   client?.close(); client = null;
@@ -489,7 +508,12 @@ function updateNames() {
   names = Array.from({ length: 8 }, (_, d) => d === 0 ? 'Та' : seatName(seatInfo(d)));
 }
 function onRoomState(payload) {
+  const previousHost = room?.seats.find(seat => seat.isHost)?.playerId;
   room = payload; me = payload.you.seat; updateNames();
+  const currentHost = room.seats.find(seat => seat.isHost)?.playerId;
+  if (previousHost && currentHost && previousHost !== currentHost) toast(room.you.isHost
+    ? 'Та одоо ширээний зохион байгуулагч боллоо.'
+    : `Ширээний зохион байгуулагч: ${hostName(room)}.`);
   if (room.seats[me]?.avatarId) { rememberAvatar(room.seats[me].avatarId); entryPicker.setValue(room.seats[me].avatarId); }
   maybeJoinVoice();
   if (payload.game) {
@@ -497,6 +521,7 @@ function onRoomState(payload) {
     const incoming = payload.game.view;
     const known = latestView && latestView.revision === incoming.revision && latestView.round === incoming.round;
     if (!known) {
+      sleepNotice.clear();
       // Resync: whatever we were animating is stale. Replace the scene without animation.
       motionEpoch++; motionController?.abort(); motionController = null; animating = false; pendingUpdates = [];
       latestView = incoming; scene = sceneFromView(incoming); selected.clear();
@@ -524,7 +549,7 @@ function describe(update, events, previous) {
       liveMove = actorEvent.lead || !target ? `${names[actor]} ${cards} тавьж эхэллээ.` : `${names[actor]} ${target} хөзрийг ${cards} хөзрөөр дарлаа.`;
     } else liveMove = `${names[actor]} ширээнээс ${actorEvent.cards.length} хөзөр авлаа.`;
     if (update.cause === 'timeout') liveMove += actor === 0 ? ' (Таны хугацаа дууссан.)' : ' (Хугацаа дууссан.)';
-    if (events.some(e => e.type === 'table-slept')) liveMove += ` Унтана — хөзөр тоглоомоос гарлаа.${update.view.phase === 'playing' ? ` ${actor === 0 ? 'Та' : `${names[actor]}`} дахин эхэлнэ.` : ' Үе дууслаа.'}`;
+    if (events.some(e => e.type === 'table-slept')) liveMove = `Унтана — хөзөр тоглоомоос гарлаа.${update.view.phase === 'playing' ? ` ${actor === 0 ? 'Та' : `${names[actor]}`} дахин эхэлнэ.` : ' Үе дууслаа.'} ${liveMove}`;
     if (update.cause === 'timeout' && actor === 0) toast('Хугацаа дууслаа. Таны өмнөөс автоматаар нүүдэл хийлээ.');
   }
   for (const event of events) {
@@ -543,6 +568,7 @@ async function processQueue() {
       const events = localizeEvents(update.events, me);
       const engineEvents = events.filter(e => ENGINE_EVENTS.has(e.type));
       const previous = scene;
+      sleepNotice.clear();
       describe(update, events, previous);
       if (events.some(e => e.type === 'round-dealt' || e.type === 'rematch') && $('round-dialog').open) $('round-dialog').close();
       const next = sceneFromView(update.view);
@@ -561,6 +587,7 @@ async function processQueue() {
         } catch (error) { console.error(error); }
         finally { if (token === motionEpoch) { animating = false; motionController = null; } }
       }
+      if (!jump && !pendingUpdates.length && scene === next && events.some(event => event.type === 'table-slept')) sleepNotice.show();
       if (rosterDirty) { rosterDirty = false; updateNames(); }
       render();
     }
@@ -649,7 +676,7 @@ function updateRoundControls() {
   let note;
   if (reviewLeft > 0) { note = `Ширээний хөзрийг хараарай · ${reviewLeft} сек`; button.disabled = true; }
   else if (eligible) { note = matchOver ? 'Суудал хэвээр, хөзрийг дахин тараана.' : dealLeft === null ? 'Танай баг бэлэн бол хөзрөө тараагаарай.' : `Бэлэн бол тараагаарай · ${dealLeft} секундын дараа автоматаар тараана`; button.disabled = continuePending || !connected; }
-  else note = matchOver ? 'Ширээ нээсэн хүн шинэ тоглолт эхлүүлэхийг хүлээж байна.' : dealLeft === null ? 'Хожсон баг хөзөр тараахыг хүлээж байна…' : `Хожсон багийг хүлээж байна… ${dealLeft} секундын дараа тараана`;
+  else note = matchOver ? `${hostName(room)} · Зохион байгуулагч шинэ тоглолт эхлүүлэхийг хүлээж байна.` : dealLeft === null ? 'Хожсон баг хөзөр тараахыг хүлээж байна…' : `Хожсон багийг хүлээж байна… ${dealLeft} секундын дараа тараана`;
   if (note !== lastReviewText) { $('review-note').textContent = note; lastReviewText = note; }
 }
 async function continueRound() {

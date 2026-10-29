@@ -54,4 +54,10 @@
   #rules-dialog .guide-toggle { justify-self: start; }
 }
 
-#rules-dialog .guide-full h3 { scroll-margin-top: 90px; }
+/* Only lesson content scrolls; both navigation and close remain in view. */
+#rules-dialog[open] { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); overflow: hidden; }
+#rules-dialog .dialog-top { position: static; flex: 0 0 auto; }
+#rules-dialog .rules-guide { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#rules-dialog .guide-scroll, #rules-dialog .guide-full { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 4px; }
+#rules-dialog .guide-nav { flex: 0 0 auto; margin-top: 8px; padding-top: 10px; padding-bottom: 4px; }
+#rules-dialog .guide-full section, #rules-dialog .guide-full h3 { scroll-margin-top: 12px; }

@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 import { controlIcon, setActionButton } from './control-icons.js';
 import { mountScreenWakeLock } from './screen-wake-lock.js';
-import { mountRulesGuide } from './rules-guide.js';
+import { mountRulesGuide } from './rules-guide.js?v=feedback1';
 const icons = Object.fromEntries(['settings','sound','muted','copy'].map(name=>[name,controlIcon(name)]));
 const brand=document.querySelector('.brand-mark');
 brand.innerHTML='<svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round" aria-hidden="true"><path d="m28 3 8 8-8 8-8-8ZM28 37l8 8-8 8-8-8ZM3 28l8-8 8 8-8 8Zm34 0 8-8 8 8-8 8ZM28 14l14 14-14 14-14-14Z"/><path d="m16 16 24 24M16 40l24-24M23 23h10v10H23Z"/></svg>';
@@ -42,6 +42,10 @@ setActionButton($('sort'),'Эрэмбэлэх','sort');
 // Settings is a real dialog: rules and existing new-match/leave controls remain reachable.
 const settings=document.createElement('dialog');settings.id='table-settings';settings.setAttribute('aria-labelledby','settings-title');
 settings.innerHTML='<div class="dialog-top"><span class="eyebrow">8 ГАР · ШИРЭЭ</span><button class="close-button" aria-label="Хаах">×</button></div><h2 id="settings-title">Ширээний тохиргоо</h2><div class="settings-actions"></div>';
+if (!document.body.classList.contains('practice-table')) {
+ const hostStatus = document.createElement('p'); hostStatus.id = 'host-status'; hostStatus.hidden = true;
+ settings.querySelector('h2').after(hostStatus);
+}
 settings.querySelector('.close-button').onclick=()=>settings.close();settings.addEventListener('click',e=>{if(e.target===settings){const b=settings.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)settings.close();}});
 for(const id of ['rules-open','new-match']){const b=$(id);settings.querySelector('.settings-actions').append(b);b.addEventListener('click',()=>settings.close());}
 if(explainButton){settings.querySelector('.settings-actions').append(explainButton);explainButton.addEventListener('click',()=>settings.close());}
@@ -59,4 +63,21 @@ if($('copy-link')){$('copy-link').innerHTML=icons.copy;$('copy-link').setAttribu
 function updateSelection(){const count=Number(document.body.dataset.selection||0);const value=count?`${count} хөзөр сонгосон`:`${$('hand').children.length} хөзөр`;if(selection.textContent!==value)selection.textContent=value;}
 new MutationObserver(updateSelection).observe(document.body,{attributes:true,attributeFilter:['data-selection']});
 new MutationObserver(updateSelection).observe($('hand'),{childList:true});updateSelection();
+// The hand count and scroll hint stay outside the moving cards.
+const hand = $('hand');
+const handStatus = document.createElement('div'); handStatus.className = 'hand-status';
+handStatus.setAttribute('aria-live', 'polite');
+hand.parentElement.append(handStatus);
+hand.tabIndex = 0; hand.setAttribute('aria-label', 'Таны хөзөр · гүйлгэж харах');
+function updateHandStatus() {
+ const left = hand.scrollLeft > 2, right = hand.scrollLeft + hand.clientWidth < hand.scrollWidth - 2;
+ const count = hand.querySelectorAll('[data-card-id]').length;
+ const value = `${count} хөзөр${left || right ? ` · ${left ? '← ' : ''}Гүйлгэж харна уу${right ? ' →' : ''}` : ''}`;
+ if (handStatus.textContent !== value) handStatus.textContent = value;
+ hand.classList.toggle('more-left', left); hand.classList.toggle('more-right', right);
+}
+new MutationObserver(updateHandStatus).observe(hand, {childList:true});
+new ResizeObserver(updateHandStatus).observe(hand);
+hand.addEventListener('scroll', updateHandStatus, {passive:true});
+updateHandStatus();
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('defense-open');document.querySelector('.defense-toggle')?.setAttribute('aria-expanded','false');}});

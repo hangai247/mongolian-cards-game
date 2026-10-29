@@ -1,6 +1,7 @@
+import { createSleepNotice, renderSleepFeedback } from './table-feedback.js';
 import { controlIcon, setActionButton, computerBadge } from './control-icons.js';
 import { renderTrumpCard } from './trump-card.js';
-import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText } from './locale-mn.js';
+import { SUIT_LABELS as LABELS, JOKER_LABELS, cardLabel, ERRORS, errorText } from './locale-mn.js?v=feedback1';
 import { mountOpenerSelection } from './opener-selection.js';
 import { layoutTablePile } from './viewport-table.js?v=ger3';
 import { advanceSignals, reconcileSignals, setSignal } from './rules/signals.js';
@@ -14,6 +15,7 @@ import { renderTableInsights, renderDefense } from './table-ui.js';
 import { TableAtmosphere } from './atmosphere.js';
 import { mountAvatarPicker, rememberedAvatar, rememberAvatar, renderSelfAvatar, normalizeAvatar, botAvatar } from './avatar-picker.js';
 const $ = id => document.getElementById(id);
+const sleepNotice = createSleepNotice(() => { if (!animating) render(); });
 const openerSelection = mountOpenerSelection({ container: $('opening-players'), seatRoot: $('felt'), onChange: renderConfirmOpener });
 // The confirm button names the chosen opener so a pick made on a seat label is reflected in the panel.
 function renderConfirmOpener() {
@@ -226,8 +228,9 @@ function render(scene = state, motion = null) {
   }
   else if (scene && scene.phase !== 'choosing-leader') { const empty = document.createElement('span'); empty.className = 'empty-table'; empty.textContent = 'Шинээр эхэлнэ.'; $('highest').append(empty); }
   layoutTablePile($('highest'));
-  $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'Түр зогссон' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
+  $('turn-label').textContent = !scene ? 'ТАНЫ СУУДАЛ БЭЛЭН' : scene.phase === 'choosing-leader' ? 'ХӨЗӨР ТАРААЛАА · БАГААРАА ЯРИЛЦАХ' : scene.phase === 'match-over' ? 'ТОГЛОЛТ ДУУСЛАА' : scene.phase !== 'playing' ? 'ҮЕ ДУУСЛАА' : paused ? 'Түр зогссон' : scene.turn === 0 ? 'ТАНЫ ЭЭЛЖ' : `${NAMES[scene.turn].toUpperCase()} · ЭЭЛЖ`;
   if (motion) $('turn-label').textContent = ({pickup:'ХӨЗӨР АВЧ БАЙНА',play:'ХӨЗӨР ТАВЬЖ БАЙНА',refill:'НӨӨЦӨӨС НӨХӨЖ БАЙНА',sleep:'УНТАНА'})[motion.type];
+  renderSleepFeedback(scene, motion, sleepNotice);
   $('reserve-count').textContent = scene?.reserve.length ?? 3;
   $('reserve-count').parentElement.classList.toggle('empty-reserve', $('reserve-count').textContent === '0');
   $('pile-count').textContent = scene?.table.pile.length ?? 0;
@@ -255,11 +258,13 @@ async function commit(move) {
   if (!state || state.phase !== 'playing' || animating) return;
   clearBot();
   const token = ++motionEpoch;
-  let completedPresentation = false;
+  let completedPresentation = false, slept = false;
+  sleepNotice.clear();
   try {
     const previous = state, actor = state.turn;
     const previousTarget = state.table.highest.map(shortCard).join(' · ');
     const { state: next, events } = applyAction(state, { ...move, player: actor, expectedRevision: state.revision });
+    slept = events.some(event => event.type === 'table-slept');
     state = next; selected.clear();
     signals = advanceSignals(previous, state, signals, [1, 2, 3, 4, 5, 6, 7]);
     const event = events.find(event => event.type === 'played' || event.type === 'picked-up');
@@ -267,7 +272,7 @@ async function commit(move) {
       const cards = event.cards.map(shortCard).join(' · ');
       liveMove = event.lead ? `${NAMES[actor]} ${cards} тавьж эхэллээ.` : `${NAMES[actor]} ${previousTarget} хөзрийг ${cards} хөзрөөр дарлаа.`;
     } else if (event?.type === 'picked-up') liveMove = `${NAMES[actor]} ширээнээс ${event.cards.length} хөзөр авлаа.`;
-    if (events.some(event => event.type === 'table-slept')) liveMove += ` Унтана — хөзөр тоглоомоос гарлаа.${state.phase === 'playing' ? ` ${actor === 0 ? 'Та' : `${NAMES[actor]}`} дахин эхэлнэ.` : ' Үе дууслаа.'}`;
+    if (events.some(event => event.type === 'table-slept')) liveMove = `Унтана — хөзөр тоглоомоос гарлаа.${state.phase === 'playing' ? ` ${actor === 0 ? 'Та' : `${NAMES[actor]}`} дахин эхэлнэ.` : ' Үе дууслаа.'} ${liveMove}`;
     // Persist one atomic engine result. Animation never changes the committed card inventory.
     save(); animating = true; motionController = new AbortController();
     renderActions();
@@ -283,6 +288,7 @@ async function commit(move) {
     console.error(error);
   } finally {
     if (token === motionEpoch) {
+      if (completedPresentation && slept) sleepNotice.show();
       animating = false; motionController = null; render();
       if (state && ['round-over','match-over'].includes(state.phase)) {
         if (completedPresentation && !paused && !document.hidden) {
@@ -309,6 +315,7 @@ function renderDiscussion(scene = state) {
   renderConfirmOpener();
 }
 function startMatch() {
+  sleepNotice.clear();
   openerSelection.reset();
   stopEffects();
   motionEpoch++; motionController?.abort(); motionController = null; animating = false;
@@ -349,6 +356,7 @@ $('continue').addEventListener('click', () => {
   else {
     state = prepareNextRound(state, deck(), state.revision);
     signals = advanceSignals(null, state, [], [1, 2, 3, 4, 5, 6, 7]);
+    sleepNotice.clear();
     paused = false; selected.clear(); liveMove = '';
 
     save(); render();

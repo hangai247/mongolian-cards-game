@@ -63,7 +63,7 @@ export function mountRulesGuide(dialog, returnFocus) {
   top.insertBefore(toggle, top.querySelector('button'));
   const guide = document.createElement('section');
   guide.className = 'rules-guide';
-  guide.innerHTML = '<p class="guide-progress" aria-live="polite" aria-atomic="true"></p><h2 id="guide-title" tabindex="-1"></h2><div class="guide-body"></div><nav class="guide-nav" aria-label="Дүрмийн хичээл"><button type="button" class="quiet-button" data-guide-back>← Өмнөх</button><button type="button" class="button primary" data-guide-next></button></nav>';
+  guide.innerHTML = '<div class="guide-scroll"><p class="guide-progress" aria-live="polite" aria-atomic="true"></p><h2 id="guide-title" tabindex="-1"></h2><div class="guide-body"></div></div><nav class="guide-nav" aria-label="Дүрмийн хичээл"><button type="button" class="quiet-button" data-guide-back>← Өмнөх</button><button type="button" class="button primary" data-guide-next></button></nav>';
   dialog.append(guide, full);
   const title = guide.querySelector('h2');
   const body = guide.querySelector('.guide-body');
@@ -82,6 +82,8 @@ export function mountRulesGuide(dialog, returnFocus) {
     back.disabled = step === 0;
     next.textContent = step === lessons.length - 1 ? 'Ширээнд буцах' : 'Дараах →';
     dialog.scrollTop = 0;
+    guide.querySelector('.guide-scroll').scrollTop = 0;
+    full.scrollTop = 0;
     if (focus) title.focus({ preventScroll: true });
   }
   function showFull(five = false) {
@@ -90,6 +92,8 @@ export function mountRulesGuide(dialog, returnFocus) {
     toggle.textContent = '← Хичээлд буцах';
     dialog.setAttribute('aria-labelledby', fullHeading.id);
     dialog.scrollTop = 0;
+    guide.querySelector('.guide-scroll').scrollTop = 0;
+    full.scrollTop = 0;
     (five ? fiveHeading : fullHeading).focus({ preventScroll: !five });
   }
   toggle.addEventListener('click', () => full.hidden ? showFull() : showGuide());

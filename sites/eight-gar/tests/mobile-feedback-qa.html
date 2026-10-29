@@ -1,0 +1,87 @@
+<!doctype html><meta charset="utf-8"><title>Mobile feedback regression checks</title>
+<style>body{margin:0;background:#eee;color:#222;font:14px system-ui}header{padding:10px}button{padding:8px}iframe{display:block;border:0;margin:12px auto}pre{white-space:pre-wrap;max-height:180px;overflow:auto}</style>
+<header><button id="run">Run feedback checks</button> <span id="status">Ready</span></header><pre id="output"></pre><iframe id="game" title="Mobile feedback preview"></iframe>
+<script type="module">
+import {createDeck,createMatch,prepareMatch,RANKS} from '../dist/rules/engine.js';
+const frame=document.querySelector('#game'), output=document.querySelector('#output'), status=document.querySelector('#status');
+const deck=createDeck(), spade=rank=>deck.find(c=>c.suit==='spades'&&c.rank===rank);
+const sizes=[[320,568],[390,844],[568,320],[844,390],[820,1180],[1440,900]];
+const assert=(ok,label)=>{if(!ok)throw Error(label);output.textContent+='✓ '+label+'\n';};
+const wait=async check=>{for(let i=0;i<250;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}throw Error('Timed out');};
+const rect=e=>e.getBoundingClientRect();
+const hit=(doc,e)=>{const b=rect(e);return e.contains(doc.elementFromPoint(b.x+b.width/2,b.y+b.height/2));};
+function fixture(kind){
+ if(kind==='opener')return prepareMatch(deck,0);
+ const own=kind==='large'?deck.slice(0,13):[spade('3')];
+ const pile=kind==='large'?[]:RANKS.slice(0,7).map(spade);
+ const reserve=kind==='sleep'?[deck.find(c=>c.color==='red')]:[];
+ const used=new Set([...own,...pile,...reserve].map(c=>c.id)),pool=deck.filter(c=>!used.has(c.id));
+ const hands=[own,...Array.from({length:7},()=>[pool.shift()])];hands[7].push(...pool);
+ const state={...createMatch(deck,0),hands,reserve,table:{pile,highest:pile.slice(-1)}};
+ if(kind==='review'){hands[7].push(...hands[1]);hands[1]=[];state.phase='round-over';state.winner=1;state.turn=1;state.scores=[0,1];}
+ return state;
+}
+async function load(kind,width,height,reduced=false){
+ frame.width=width;frame.height=height;
+ localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state:fixture(kind),signals:[]}));
+ const loaded=new Promise(r=>frame.onload=r);
+ if(reduced){
+  const html=await(await fetch('../dist/practice.html')).text();
+  frame.srcdoc=html.replace('<head>',`<head><base href="${new URL('../dist/',location.href)}"><script>const match=window.matchMedia;window.matchMedia=q=>{const m=match(q);if(q.includes('prefers-reduced-motion'))Object.defineProperty(m,'matches',{value:true});return m;};<\/script>`);
+ }else{frame.removeAttribute('srcdoc');frame.src='../dist/practice.html?feedback='+Date.now();}
+ await loaded;await wait(()=>frame.contentDocument.querySelector('.hand-status')&&frame.contentDocument.querySelector('.seat-1')?.style.left);
+ await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+ return frame.contentDocument;
+}
+document.querySelector('#run').onclick=async()=>{
+ output.textContent='';status.textContent='Running';
+ try{
+  for(const [w,h] of sizes){
+   let doc=await load('opener',w,h), label=`${w}×${h}`;
+   const choice=doc.querySelector('#opening-players button');choice.click();
+   const confirm=doc.querySelector('#confirm-opener');confirm.scrollIntoView({block:'nearest'});
+   assert(!confirm.disabled&&hit(doc,confirm),label+': opener confirmation is reachable');
+   doc.querySelector('.header-right button[aria-label="Тохиргоо"]').click();doc.querySelector('#rules-open').click();
+   await wait(()=>doc.querySelector('#rules-dialog').open);
+   for(let i=0;i<5;i++){
+    const next=doc.querySelector('[data-guide-next]'),nav=rect(next);
+    assert(nav.top>=0&&nav.bottom<=h&&hit(doc,next),label+': lesson '+(i+1)+' navigation stays visible');
+    next.click();
+   }
+   assert(!doc.querySelector('#rules-dialog').open,label+': final lesson returns to game');
+   doc.querySelector('.header-right button[aria-label="Тохиргоо"]').click();doc.querySelector('#rules-open').click();
+   await new Promise(r=>requestAnimationFrame(r));
+   doc.querySelector('.guide-toggle').click();doc.querySelector('#rules-signals').scrollIntoView({block:'start'});
+   assert(rect(doc.querySelector('#rules-signals')).top>=rect(doc.querySelector('#rules-dialog .dialog-top')).bottom-1,label+': full rules anchor clears header');
+   doc=await load('large',w,h);
+   const hand=doc.querySelector('#hand');
+   assert(doc.querySelector('.hand-status').textContent.startsWith('13 хөзөр'),label+': full hand count is visible');
+   assert(hand.scrollWidth>hand.clientWidth&&doc.querySelector('.hand-status').textContent.includes('→'),label+': oversized hand has a scroll cue');
+   hand.scrollLeft=hand.scrollWidth;await new Promise(r=>requestAnimationFrame(r));
+   const before=hand.scrollLeft;doc.querySelector('#sort').click();
+   assert(Math.abs(hand.scrollLeft-before)<2,label+': sorting preserves scroll position');
+   const last=rect(hand.lastElementChild),box=rect(hand);
+   assert(last.left>=box.left-1&&last.right<=box.right+1,label+': last card can be reached');
+   doc=await load('review',w,h);
+   await wait(()=>doc.querySelector('#round-dialog').open);
+   assert(getComputedStyle(doc.querySelector('#hand')).visibility==='visible'&&rect(doc.querySelector('#hand .card')).height>20,label+': remaining hand stays visible in review');
+   assert(hit(doc,doc.querySelector('#continue')),label+': next-round control is unobstructed');
+   assert(hit(doc,doc.querySelector('#pile-open')),label+': final pile remains inspectable');
+  }
+  for(const reduced of [false,true]){
+   const doc=await load('sleep',390,844,reduced);
+   assert(doc.querySelector('#sleep-chip').textContent==='Унтана 7/8','restored seventh play shows 7/8');
+   doc.querySelector('#pause').click();doc.querySelector('#hand button').click();doc.querySelector('#play').click();
+   await wait(()=>doc.querySelector('#felt').getAttribute('aria-busy')==='false');
+   assert(doc.querySelector('#turn-label').textContent==='УНТАНА · хөзөр унтлаа',`sleep title survives animation (reduced=${reduced})`);
+   assert(doc.querySelector('#live-move').textContent.startsWith('Унтана'),'sleep narration starts with the rule event');
+   assert(doc.querySelector('#sleep-chip').textContent==='Унтана 8/8','eighth play stays visible after pile clears');
+   await new Promise(r=>setTimeout(r,1600));
+   assert(doc.querySelector('#turn-label').textContent.includes('УНТАНА'),'notice is readable beyond the animation frame');
+   await wait(()=>doc.querySelector('#sleep-chip').textContent==='Унтана 0/8');
+   assert(doc.querySelector('#turn-label').textContent==='ТАНЫ ЭЭЛЖ','turn guidance returns after notice expires');
+  }
+  status.textContent='All feedback checks passed';
+ }catch(e){status.textContent='Failed';output.textContent+='✗ '+e.stack;}
+};
+</script>

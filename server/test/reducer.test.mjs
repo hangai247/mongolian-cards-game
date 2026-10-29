@@ -218,3 +218,17 @@ test('rematch is host-only after match-over, keeps seats, resets scores and the 
   assert.deepEqual(again.roomEvents.map(e => e.type), ['rematch', 'round-dealt']);
   assert.ok(again.snapshot.game.state.revision > finished.game.state.revision, 'revision keeps increasing across rematches');
 });
+
+test('host takeover preserves a usable rematch role after the original host reclaims', () => {
+  let { room, rng } = started(2);
+  room = applyCommand(room, { type: 'disconnect', playerId: 'p0' }, ctxAt(3000, rng)).snapshot;
+  room = applyCommand(room, { type: 'bot-takeover', playerId: 'p0', offlineSince: 3000 }, ctxAt(183000, rng)).snapshot;
+  assert.equal(room.hostPlayerId, 'p1');
+  room = applyCommand(room, { type: 'connect', playerId: 'p0' }, ctxAt(184000, rng)).snapshot;
+  assert.equal(room.seats[0].kind, 'human');
+  assert.equal(room.hostPlayerId, 'p1', 'reclaiming a seat does not silently remove the promoted host');
+  room = runToEnd(room, rng).room;
+  rejects(() => applyCommand(room, { type: 'rematch', playerId: 'p0' }, ctxAt(9999999, rng)), 'NOT_HOST');
+  const next = applyCommand(room, { type: 'rematch', playerId: 'p1' }, ctxAt(9999999, rng)).snapshot;
+  assert.equal(next.game.state.phase, 'choosing-leader');
+});

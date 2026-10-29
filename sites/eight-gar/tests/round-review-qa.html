@@ -15,14 +15,14 @@ async function load(matchOver,width,height){
  frame.width=width;frame.height=height;
  localStorage.setItem('naiman-gar-practice-v1',JSON.stringify({format:2,state:fixture(matchOver),byRank:false,signals:[]}));
  const ready=new Promise(resolve=>frame.onload=resolve);frame.src='../dist/practice.html?review='+Date.now();await ready;
- await waitFor(()=>frame.contentDocument.querySelector('#round-dialog')?.open && frame.contentDocument.querySelector('.seat-0')?.style.left && frame.contentDocument.querySelector('.room-photo')?.naturalWidth > 0);
+ await waitFor(()=>frame.contentDocument.querySelector('#round-dialog')?.open && frame.contentDocument.querySelector('.seat-1')?.style.left && frame.contentDocument.querySelector('.room-photo')?.naturalWidth > 0);
  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
  return frame.contentDocument;
 }
 document.querySelector('#run').onclick=async()=>{
  output.textContent='';status.textContent='Running';
  try{
-  for(const matchOver of [false,true])for(const [width,height] of [[320,568],[390,844],[568,320],[844,390],[1440,900]]){
+  for(const matchOver of [false,true])for(const [width,height] of [[320,568],[390,844],[568,320],[844,390],[820,1180],[1440,900]]){
    const doc=await load(matchOver,width,height),panel=doc.querySelector('#round-dialog'),pile=doc.querySelector('#highest'),expand=doc.querySelector('#pile-open');
    const label=`${width}×${height} ${matchOver?'match':'round'} review`;
    assert(!panel.matches(':modal'),label+': results do not block the page');

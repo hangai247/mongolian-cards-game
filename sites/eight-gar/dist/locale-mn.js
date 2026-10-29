@@ -13,6 +13,7 @@ export function seatName(info) {
   if (!info || info.kind === 'empty') return 'Сул суудал';
   // Human names, including disconnected players' reserved seats, are user content.
   // A computer is named after the face it is drawn with, as in practice.
+  if (info.kind === 'bot' && info.reservedForName) return info.reservedForName;
   if (info.kind === 'bot' && !info.reservedForName) return `${AVATARS.find(avatar => avatar.id === botAvatar(info.seat))?.name ?? 'Тоглогч'} (компьютер)`;
   return info.name ?? info.reservedForName ?? 'Тоглогч';
 }
